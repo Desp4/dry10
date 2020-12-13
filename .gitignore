@@ -1,5 +1,13 @@
 .vs/
 build/
 
+res/models/*
+res/shaders/*
+res/textures/*
+
+!res/models/.gitkeep
+!res/shaders/.gitkeep
+!res/textures/.gitkeep
+
 CMakeSettings.json
 cmakeset.sh
