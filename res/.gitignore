@@ -1,7 +1,0 @@
-textures/*
-shaders/*
-models/*
-
-!textures/.gitkeep
-!shaders/.gitkeep
-!models/.gitkeep
