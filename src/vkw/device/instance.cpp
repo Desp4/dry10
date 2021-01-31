@@ -1,5 +1,7 @@
 #include "instance.hpp"
 
+#include "dbg/log.hpp"
+
 namespace vkw
 {
     Instance::Instance(std::span<const char* const> extensions, std::span<const char* const> layers, DebugCallback callback, const char* exeName)
@@ -37,12 +39,16 @@ namespace vkw
         }
 
         vkCreateInstance(&instanceInfo, NULL_ALLOC, &_instance.handle);
+        LOG_DBG("vulkan instance for dry1 created\n\tapplication name: %s\n\tapi version: %i.%i.%i\n\tvalidation layers: %s",
+            exeName,
+            appInfo.apiVersion >> 22, (appInfo.apiVersion >> 12) & 0xFFF, appInfo.apiVersion & 0xFFF,
+            isDebug ? "enabled" : "disabled");
 
         if (isDebug)
         {
             const auto createDebugger = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
                 vkGetInstanceProcAddr(_instance, "vkCreateDebugUtilsMessengerEXT"));
-            createDebugger(_instance, &debugInfo, NULL_ALLOC, &_debugger.handle);
+            createDebugger(_instance, &debugInfo, NULL_ALLOC, &_debugger);
         }
     }
 
@@ -65,11 +71,5 @@ namespace vkw
         std::vector<VkPhysicalDevice> devices(devCount);
         vkEnumeratePhysicalDevices(_instance, &devCount, devices.data());
         return devices;
-    }
-
-
-    VkInstance Instance::instance() const
-    {
-        return _instance;
     }
 }

@@ -15,7 +15,7 @@ namespace vkw
     };
     using RenderPassFlags = uint32_t;
 
-    class RenderPass : Movable<RenderPass>
+    class RenderPass : public Movable<RenderPass>
     {
     public:
         using Movable<RenderPass>::operator=;
@@ -30,9 +30,9 @@ namespace vkw
 
         void startCmdPass(VkCommandBuffer buffer, uint32_t frameInd) const;
 
-        VkRenderPass renderPass() const;
-        VkSampleCountFlagBits rasterSampleCount() const;
-        VkBool32 depthEnabled() const;
+        const VkHandle<VkRenderPass>& renderPass() const { return _pass; }
+        const VkSampleCountFlagBits& rasterSampleCount() const { return _samples; }
+        const VkBool32& depthEnabled() const { return _depthEnabled; }
 
     private:
         DevicePtr _device;

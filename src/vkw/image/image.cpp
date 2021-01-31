@@ -24,38 +24,18 @@ namespace vkw
         imageInfo.samples = samples;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        vkCreateImage(_device.ptr->device(), &imageInfo, NULL_ALLOC, &_image.handle);
+        vkCreateImage(_device->device(), &imageInfo, NULL_ALLOC, &_image);
         VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(_device.ptr->device(), _image, &memRequirements);
+        vkGetImageMemoryRequirements(_device->device(), _image, &memRequirements);
 
         _memory = DeviceMemory(device, memRequirements.size,
             DeviceMemory::findMemoryTypeIndex(*_device, memRequirements.memoryTypeBits, properties));
 
-        vkBindImageMemory(_device.ptr->device(), _image, _memory.memory(), 0);
+        vkBindImageMemory(_device->device(), _image, _memory.memory(), 0);
     }
 
     Image::~Image()
     {
-        if (_device) vkDestroyImage(_device.ptr->device(), _image, NULL_ALLOC);
-    }
-
-    VkImage Image::image() const
-    {
-        return _image;
-    }
-
-    VkExtent2D Image::extent() const
-    {
-        return _extent;
-    }
-
-    uint32_t Image::mipLevels() const
-    {
-        return _mipLevels;
-    }
-
-    VkFormat Image::format() const
-    {
-        return _format;
+        if (_device) vkDestroyImage(_device->device(), _image, NULL_ALLOC);
     }
 }

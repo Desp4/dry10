@@ -1,7 +1,6 @@
 #pragma once
 
 #ifdef _WIN32
-  //#define NOMINMAX
   #include <windows.h>
 #endif
 
@@ -12,9 +11,7 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
-#include <cstdint>
-
-#include "../util.hpp"
+#include "util/util.hpp"
 
 namespace wsi
 {

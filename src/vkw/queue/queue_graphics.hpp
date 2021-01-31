@@ -1,7 +1,7 @@
 #pragma once
 
 #include "queue.hpp"
-#include "../image/image.hpp"
+#include "vkw/image/image.hpp"
 
 namespace vkw
 {
@@ -14,6 +14,6 @@ namespace vkw
         void generateMipMaps(const Image& image) const;
 
         // msvc doesn't recognize the constructor in base
-        GraphicsQueue& operator=(GraphicsQueue&& oth) { Queue::operator=(std::move(oth)); return *this; }
+        inline GraphicsQueue& operator=(GraphicsQueue&& oth) { Queue::operator=(std::move(oth)); return *this; }
     };
 }

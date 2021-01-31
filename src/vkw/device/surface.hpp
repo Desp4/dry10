@@ -1,7 +1,11 @@
 #pragma once
 
+#ifdef _WIN32
+  #define VK_USE_PLATFORM_WIN32_KHR
+#endif
+
 #include "instance.hpp"
-#include "../../window/window.hpp"
+#include "window/window.hpp"
 
 namespace vkw
 {
@@ -15,7 +19,7 @@ namespace vkw
         Surface(const Instance* instance, wsi::NativeHandle handle);
         ~Surface();
 
-        VkSurfaceKHR surface() const;
+        const VkHandle<VkSurfaceKHR>& surface() const { return _surface; }
 
     private:
         NullablePtr<const Instance> _instance;

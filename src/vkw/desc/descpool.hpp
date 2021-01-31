@@ -1,9 +1,13 @@
 #pragma once
 
-#include "descsets.hpp"
+#include <vector>
+
+#include "vkw/device/device.hpp"
 
 namespace vkw
 {
+    using DescriptorSets = std::vector<VkDescriptorSet>;
+
     class DescriptorPool : public Movable<DescriptorPool>
     {
     public:

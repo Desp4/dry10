@@ -14,7 +14,7 @@ namespace vkw
         FrameBuffer(const Device* device, VkRenderPass renderPass, std::span<const VkImageView> views, VkExtent2D extent);
         ~FrameBuffer();
         
-        VkFramebuffer frameBuffer() const;
+        const VkHandle<VkFramebuffer>& frameBuffer() const { return _frameBuffer; }
 
     private:
         DevicePtr _device;

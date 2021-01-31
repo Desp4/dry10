@@ -14,7 +14,7 @@ namespace vkw
         TexSampler(const Device* device, uint32_t mipLevels);
         ~TexSampler();
 
-        VkSampler sampler() const;
+        const VkHandle<VkSampler>& sampler() const { return _sampler; }
 
     private:
         DevicePtr _device;

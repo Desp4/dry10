@@ -1,5 +1,5 @@
 #include "surface.hpp"
-
+static auto f = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 namespace vkw
 {
     Surface::Surface(const Instance* instance, wsi::NativeHandle handle) :
@@ -11,17 +11,12 @@ namespace vkw
         surfaceInfo.hinstance = GetModuleHandle(nullptr);
         surfaceInfo.hwnd = handle;
 
-        vkCreateWin32SurfaceKHR(_instance.ptr->instance(), &surfaceInfo, NULL_ALLOC, &_surface.handle);
+        vkCreateWin32SurfaceKHR(_instance->instance(), &surfaceInfo, NULL_ALLOC, &_surface);
 #endif
     }
 
     Surface::~Surface()
     {
-        if (_instance) vkDestroySurfaceKHR(_instance.ptr->instance(), _surface, NULL_ALLOC);
-    }
-
-    VkSurfaceKHR Surface::surface() const
-    {
-        return _surface;
+        if (_instance) vkDestroySurfaceKHR(_instance->instance(), _surface, NULL_ALLOC);
     }
 }

@@ -13,16 +13,11 @@ namespace vkw
         framebufInfo.width = extent.width;
         framebufInfo.height = extent.height;
         framebufInfo.layers = 1;
-        vkCreateFramebuffer(_device.ptr->device(), &framebufInfo, NULL_ALLOC, &_frameBuffer.handle);
+        vkCreateFramebuffer(_device->device(), &framebufInfo, NULL_ALLOC, &_frameBuffer);
     }
 
     FrameBuffer::~FrameBuffer()
     {
-        if (_device) vkDestroyFramebuffer(_device.ptr->device(), _frameBuffer, NULL_ALLOC);
-    }
-
-    VkFramebuffer FrameBuffer::frameBuffer() const
-    {
-        return _frameBuffer;
+        if (_device) vkDestroyFramebuffer(_device->device(), _frameBuffer, NULL_ALLOC);
     }
 }

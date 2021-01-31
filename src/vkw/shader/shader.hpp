@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../device/device.hpp"
+#include "vkw/device/device.hpp"
 
 namespace vkw
 {
@@ -22,8 +22,8 @@ namespace vkw
         ShaderModule(const Device* device, std::span<const uint32_t> bin, ShaderType type);
         ~ShaderModule();
 
-        VkShaderModule module() const;
-        ShaderType type() const;
+        const VkHandle<VkShaderModule>& shaderModule() const { return _module; }
+        const ShaderType& type() const { return _type; }
 
     private:
         DevicePtr _device;

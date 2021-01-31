@@ -1,9 +1,10 @@
 #pragma once
 
-#include "../cmd/cmdbuffer.hpp"
+#include "vkw/cmd/cmdbuffer.hpp"
 
 namespace vkw
 {
+    // TODO : if doing multiple pools, ring buffers etc need to reflect that or just dump all queue functionality in free functions
     class Queue : public Movable<Queue>
     {
     public:
@@ -15,10 +16,12 @@ namespace vkw
 
         void submitCmd(VkCommandBuffer cmdBuffer) const;
 
-    protected:
-        DevicePtr _device;
-        VkQueue _queue;
+        // NOTE : need in these in renderer for allocating buffers and for swapchain only
+        VkQueue queue() const { return _queue; }
+        const CmdPool& pool() const { return _pool; }
 
+    protected:
+        VkQueue _queue;
         CmdPool _pool;
     };
 }

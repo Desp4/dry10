@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../device/device.hpp"
+#include "vkw/device/device.hpp"
 
 namespace vkw
 {
@@ -14,7 +14,7 @@ namespace vkw
         CmdPool(const Device* device, uint32_t queue);
         ~CmdPool();
 
-        VkCommandPool pool() const;
+        const VkHandle<VkCommandPool>& pool() const { return _pool; }
 
     private:
         friend class CmdBuffer;

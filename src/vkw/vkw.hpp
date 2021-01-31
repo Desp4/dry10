@@ -1,11 +1,8 @@
 #pragma once
 
-#ifdef _WIN32
-  #define VK_USE_PLATFORM_WIN32_KHR
-#endif
-
 #include <vulkan/vulkan.h>
-#include "../util.hpp"
+
+#include "util/util.hpp"
 
 #define NULL_ALLOC nullptr
 
@@ -19,23 +16,17 @@ namespace vkw
     {
         T handle;
 
-        VkHandle() : handle(VK_NULL_HANDLE)
-        {
-        }
-
-        VkHandle(const T& oth) : handle(oth)
-        {
-        }
-
+        VkHandle() : handle(VK_NULL_HANDLE) {}
+        explicit VkHandle(T oth) : handle(oth) {}
         VkHandle(VkHandle&& oth) : handle(oth.handle)
         {
             oth.handle = VK_NULL_HANDLE;
         }
 
-        operator T() const
-        {
-            return handle;
-        }
+        operator T() const { return handle; }
+
+        const T* operator&() const { return &handle; }
+        T* operator&() { return &handle; }
 
         VkHandle& operator=(VkHandle&& oth)
         {
@@ -44,7 +35,7 @@ namespace vkw
             return *this;
         }
 
-        VkHandle& operator=(const T& oth)
+        VkHandle& operator=(T oth)
         {
             handle = oth;
             return *this;

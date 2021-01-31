@@ -9,7 +9,9 @@ namespace vkw
         {
             if (typeFilter & (1 << i) && properties ==
                 (memProperties.memoryTypes[i].propertyFlags & properties))
+            {
                 return i;
+            }
         }
         return UINT32_MAX;
     }
@@ -23,29 +25,19 @@ namespace vkw
         allocInfo.allocationSize = _size;
         allocInfo.memoryTypeIndex = memoryType;
 
-        vkAllocateMemory(_device.ptr->device(), &allocInfo, NULL_ALLOC, &_memory.handle);
+        vkAllocateMemory(_device->device(), &allocInfo, NULL_ALLOC, &_memory);
     }
 
     DeviceMemory::~DeviceMemory()
     {
-        if (_device) vkFreeMemory(_device.ptr->device(), _memory, NULL_ALLOC);
+        if (_device) vkFreeMemory(_device->device(), _memory, NULL_ALLOC);
     }
 
     void DeviceMemory::writeToMemory(const void* data, VkDeviceSize size)
     {
         void* mappedData;
-        vkMapMemory(_device.ptr->device(), _memory, 0, size, 0, &mappedData);
+        vkMapMemory(_device->device(), _memory, 0, size, 0, &mappedData);
         memcpy(mappedData, data, size);
-        vkUnmapMemory(_device.ptr->device(), _memory);
-    }
-
-    VkDeviceMemory DeviceMemory::memory() const
-    {
-        return _memory;
-    }
-
-    VkDeviceSize DeviceMemory::size() const
-    {
-        return _size;
+        vkUnmapMemory(_device->device(), _memory);
     }
 }

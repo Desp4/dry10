@@ -11,21 +11,11 @@ namespace vkw
         shaderInfo.codeSize = bin.size() * sizeof(uint32_t);
         shaderInfo.pCode = bin.data();
 
-        vkCreateShaderModule(_device.ptr->device(), &shaderInfo, NULL_ALLOC, &_module.handle);
+        vkCreateShaderModule(_device->device(), &shaderInfo, NULL_ALLOC, &_module);
     }
 
     ShaderModule::~ShaderModule()
     {
-        if (_device) vkDestroyShaderModule(_device.ptr->device(), _module, NULL_ALLOC);
-    }
-
-    VkShaderModule ShaderModule::module() const
-    {
-        return _module;
-    }
-
-    ShaderType ShaderModule::type() const
-    {
-        return _type;
+        if (_device) vkDestroyShaderModule(_device->device(), _module, NULL_ALLOC);
     }
 }

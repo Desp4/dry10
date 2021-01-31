@@ -1,16 +1,6 @@
 #include "renderpass.hpp"
 
-#include <vector>
 #include <array>
-
-uint32_t popcount(uint32_t i)
-{
-    // https://stackoverflow.com/questions/109023/how-to-count-the-number-of-set-bits-in-a-32-bit-integer
-    // TODO : move and come back later replace with intrinsics or fall back to this if none present
-    i = i - ((i >> 1) & 0x55555555);
-    i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
-    return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
-}
 
 namespace vkw
 {
@@ -19,7 +9,7 @@ namespace vkw
         _device(device),
         _extent(extent)
     {
-        std::vector<VkAttachmentDescription> attachments(popcount(flags));
+        std::vector<VkAttachmentDescription> attachments(util::popcount(flags));
         uint32_t index = 0;
         const bool hasColor = flags & RenderPassFlagBits::RenderPass_Color;
         const bool hasDepth = flags & RenderPassFlagBits::RenderPass_Depth;
@@ -101,20 +91,25 @@ namespace vkw
         renderPassInfo.pSubpasses = &subpass;
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &dependency;
-        vkCreateRenderPass(_device.ptr->device(), &renderPassInfo, NULL_ALLOC, &_pass.handle);
+        vkCreateRenderPass(_device->device(), &renderPassInfo, NULL_ALLOC, &_pass);
 
         if (hasDepth)
+        {
             _depthImage = ImageViewPair(_device, _extent, 1, samples, depthFormat, VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+        }
         if (hasMSAA)
+        {
             _colorImage = ImageViewPair(_device, _extent, 1, samples, imageFormat, VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+        }
     }
 
     RenderPass::~RenderPass()
     {
-        if (_device) vkDestroyRenderPass(_device.ptr->device(), _pass, NULL_ALLOC);
+        if (_device) vkDestroyRenderPass(_device->device(), _pass, NULL_ALLOC);
     }
 
     void RenderPass::createFrameBuffers(std::span<const ImageView> swapViews)
@@ -147,20 +142,5 @@ namespace vkw
         passBeginInfo.clearValueCount = clearValues.size();
         passBeginInfo.pClearValues = clearValues.data();
         vkCmdBeginRenderPass(buffer, &passBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    }
-
-    VkRenderPass RenderPass::renderPass() const
-    {
-        return _pass;
-    }
-
-    VkSampleCountFlagBits RenderPass::rasterSampleCount() const
-    {
-        return _samples;
-    }
-
-    VkBool32 RenderPass::depthEnabled() const
-    {
-        return _depthEnabled;
     }
 }

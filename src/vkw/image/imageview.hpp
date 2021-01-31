@@ -14,7 +14,7 @@ namespace vkw
         ImageView(const Device* device, VkImage image, VkFormat format, uint32_t mipLevels, VkImageAspectFlags aspectFlags);
         ~ImageView();
 
-        VkImageView imageView() const;
+        const VkHandle<VkImageView>& imageView() const { return _view; }
 
     private:
         DevicePtr _device;

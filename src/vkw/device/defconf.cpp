@@ -55,7 +55,7 @@ namespace vkw::conf
         std::vector<VkSurfaceFormatKHR> supportedFormats(count);
         vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, supportedFormats.data());
 
-        for (const auto supportedFormat : supportedFormats)
+        for (const VkSurfaceFormatKHR supportedFormat : supportedFormats)
         {
             if (supportedFormat.colorSpace == colorSpace && supportedFormat.format == format)
                 return true;
@@ -78,19 +78,75 @@ namespace vkw::conf
         return false;
     }
 
-    std::vector<uint32_t> getQueueFamilyIndices(VkPhysicalDevice device, VkQueueFlags queueFamilies)
-    {
-        uint32_t queueFamCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamCount, nullptr);
-        std::vector<VkQueueFamilyProperties> families(queueFamCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamCount, families.data());
+    // find index functions are carbon copies of https://github.com/charles-lunarg/vk-bootstrap/blob/master/src/VkBootstrap.cpp
 
-        std::vector<uint32_t> ret;
+    int32_t findSeparateTransferIndex(std::span<const VkQueueFamilyProperties> families)
+    {
+        int32_t fallback = -1;
         for (int i = 0; i < families.size(); ++i)
         {
-            if (families[i].queueFlags & queueFamilies)
-                ret.push_back(i);
+            const auto flags = families[i].queueFlags;
+            if ((flags & VK_QUEUE_TRANSFER_BIT) && !(flags & VK_QUEUE_GRAPHICS_BIT))
+            {
+                if (flags & VK_QUEUE_COMPUTE_BIT)
+                    fallback = i;
+                else
+                    return i;
+            }
         }
-        return ret;
+        return fallback;
+    }
+
+    int32_t findSeparateGraphicsIndex(std::span<const VkQueueFamilyProperties> families)
+    {
+        int32_t fallback = -1;
+        for (int i = 0; i < families.size(); ++i)
+        {
+            const auto flags = families[i].queueFlags;
+            if ((flags & VK_QUEUE_GRAPHICS_BIT) && !(flags & VK_QUEUE_TRANSFER_BIT))
+            {
+                if (flags & VK_QUEUE_COMPUTE_BIT)
+                    fallback = i;
+                else
+                    return i;
+            }
+        }
+        return fallback;
+    }
+
+    int32_t findSeparateComputeIndex(std::span<const VkQueueFamilyProperties> families)
+    {
+        for (int i = 0; i < families.size(); ++i)
+        {
+            const auto flags = families[i].queueFlags;
+            if ((flags & VK_QUEUE_COMPUTE_BIT) &&
+                !(flags & VK_QUEUE_GRAPHICS_BIT) && !(flags & VK_QUEUE_TRANSFER_BIT))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    int32_t findPresentIndex(std::span<const VkQueueFamilyProperties> families, VkPhysicalDevice device, VkSurfaceKHR surface)
+    {
+        for (int i = 0; i < families.size(); ++i)
+        {
+            VkBool32 supported = VK_FALSE;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &supported);
+            if (supported == VK_TRUE)
+                return i;
+        }
+        return -1;
+    }
+
+    int32_t findAnyIndex(std::span<const VkQueueFamilyProperties> families, VkQueueFlags flags)
+    {
+        for (int i = 0; i < families.size(); ++i)
+        {
+            if (families[i].queueFlags & flags)
+                return i;
+        }
+        return -1;
     }
 }

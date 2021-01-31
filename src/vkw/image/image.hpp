@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../memory.hpp"
+#include "vkw/memory.hpp"
 
 namespace vkw
 {
@@ -15,10 +15,10 @@ namespace vkw
               VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties);
         ~Image();
 
-        VkImage image() const;
-        VkExtent2D extent() const;
-        uint32_t mipLevels() const;
-        VkFormat format() const;
+        const VkHandle<VkImage>& image() const { return _image; }
+        const VkExtent2D& extent() const { return _extent; }
+        const uint32_t& mipLevels() const { return _mipLevels; }
+        const VkFormat& format() const { return _format; }
 
     private:
         DevicePtr _device;

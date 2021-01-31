@@ -3,7 +3,7 @@
 #include <vector>
 #include <span>
 
-#include "../vkw.hpp"
+#include "vkw/vkw.hpp"
 
 namespace vkw
 {
@@ -24,7 +24,8 @@ namespace vkw
         ~Instance();
 
         std::vector<VkPhysicalDevice> enumeratePhysicalDevices() const;
-        VkInstance instance() const;
+
+        const VkHandle<VkInstance>& instance() const { return _instance; }
 
     private:
         VkHandle<VkInstance> _instance;

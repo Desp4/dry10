@@ -3,8 +3,7 @@
 namespace vkw
 {
     Queue::Queue(const Device* device, uint32_t queueFamilyIndex, uint32_t queueIndex) :
-        _device(device),
-        _pool(_device, queueFamilyIndex)
+        _pool(device, queueFamilyIndex)
     {
         vkGetDeviceQueue(device->device(), queueFamilyIndex, queueIndex, &_queue);
     }
@@ -19,6 +18,6 @@ namespace vkw
         submitInfo.pCommandBuffers = &cmdBuffer;
 
         vkQueueSubmit(_queue, 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(_queue);
+        vkQueueWaitIdle(_queue); // NOTE : waiting here, perhaps not needed in some cases
     }
 }

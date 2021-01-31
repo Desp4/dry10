@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../device/device.hpp"
+#include "vkw/device/device.hpp"
 
 namespace vkw
 {
@@ -14,7 +14,7 @@ namespace vkw
         DescriptorLayout(const Device* device, std::span<const VkDescriptorSetLayoutBinding> bindings);
         ~DescriptorLayout();
 
-        const VkDescriptorSetLayout& layout() const;
+        const VkHandle<VkDescriptorSetLayout>& layout() const { return _descriptorSetLayout; }
 
     private:
         DevicePtr _device;

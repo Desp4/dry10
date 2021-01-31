@@ -4,30 +4,36 @@
 
 namespace vkw
 {
-    GraphicsPipeline::GraphicsPipeline(const Device* device, const RenderPass* renderPass, const Material& material, VkExtent2D extent) :
+    GraphicsPipeline::GraphicsPipeline(
+        const Device* device, const RenderPass* renderPass, VkExtent2D extent,
+        std::span<const ShaderModule> modules, const dab::ShaderVkData& shaderData, std::span<const VkDescriptorSetLayout> layouts) :
         _device(device),
         _renderPass(renderPass),
-        _hasDepth(renderPass->depthEnabled()),
         _extent(extent)
     {
-        std::vector<VkPipelineShaderStageCreateInfo> shaderStages(material.shader.modules.size());
-        for (int i = 0; i < shaderStages.size(); ++i)
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+        shaderStages.reserve(modules.size());
+
+        for (const auto& shaderModule : modules)
         {
-            shaderStages[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            shaderStages[i].pNext = nullptr;
-            shaderStages[i].flags = 0;
-            shaderStages[i].stage = material.shader.stages[i];
-            shaderStages[i].module = material.shader.modules[i];
-            shaderStages[i].pName = "main";
-            shaderStages[i].pSpecializationInfo = nullptr;
+            VkPipelineShaderStageCreateInfo shaderStage{};
+            shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            shaderStage.pNext = nullptr;
+            shaderStage.flags = 0;
+            shaderStage.stage = static_cast<VkShaderStageFlagBits>(shaderModule.type());
+            shaderStage.module = shaderModule.shaderModule();
+            shaderStage.pName = "main";
+            shaderStage.pSpecializationInfo = nullptr;
+            
+            shaderStages.push_back(shaderStage);
         }
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         vertexInputInfo.vertexBindingDescriptionCount = 1;
-        vertexInputInfo.pVertexBindingDescriptions = &material.shader.data.input.binding;
-        vertexInputInfo.vertexAttributeDescriptionCount = material.shader.data.input.descriptors.size();
-        vertexInputInfo.pVertexAttributeDescriptions = material.shader.data.input.descriptors.data();
+        vertexInputInfo.pVertexBindingDescriptions = &shaderData.vertexBinding;
+        vertexInputInfo.vertexAttributeDescriptionCount = shaderData.vertexDescriptors.size();
+        vertexInputInfo.pVertexAttributeDescriptions = shaderData.vertexDescriptors.data();
 
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
         assemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -75,10 +81,11 @@ namespace vkw
         multisampleInfo.alphaToCoverageEnable = VK_FALSE;
         multisampleInfo.alphaToOneEnable = VK_FALSE;
 
+        const VkBool32 depthEnabled = _renderPass->depthEnabled();
         VkPipelineDepthStencilStateCreateInfo depthStencilInfo{};
         depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        depthStencilInfo.depthTestEnable = _hasDepth;
-        depthStencilInfo.depthWriteEnable = _hasDepth;
+        depthStencilInfo.depthTestEnable = depthEnabled;
+        depthStencilInfo.depthWriteEnable = depthEnabled;
         depthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS;
         depthStencilInfo.depthBoundsTestEnable = VK_FALSE; // assume no bounds
         depthStencilInfo.minDepthBounds = 0.0f;
@@ -91,9 +98,9 @@ namespace vkw
             VK_COLOR_COMPONENT_G_BIT |
             VK_COLOR_COMPONENT_B_BIT |
             VK_COLOR_COMPONENT_A_BIT;
-        blendAttachment.blendEnable = material.blendEnabled;
-        blendAttachment.srcColorBlendFactor = material.blendEnabled ? VK_BLEND_FACTOR_SRC_ALPHA : VK_BLEND_FACTOR_ONE;
-        blendAttachment.dstColorBlendFactor = material.blendEnabled ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : VK_BLEND_FACTOR_ZERO;
+        blendAttachment.blendEnable = depthEnabled;
+        blendAttachment.srcColorBlendFactor = depthEnabled ? VK_BLEND_FACTOR_SRC_ALPHA : VK_BLEND_FACTOR_ONE;
+        blendAttachment.dstColorBlendFactor = depthEnabled ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : VK_BLEND_FACTOR_ZERO;
         blendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
         blendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
         blendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
@@ -112,10 +119,10 @@ namespace vkw
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &material.shader.layout;
+        pipelineLayoutInfo.setLayoutCount = layouts.size();
+        pipelineLayoutInfo.pSetLayouts = layouts.data();
         pipelineLayoutInfo.pushConstantRangeCount = 0;
-        vkCreatePipelineLayout(_device.ptr->device(), &pipelineLayoutInfo, NULL_ALLOC, &_pipelineLayout.handle);
+        vkCreatePipelineLayout(_device->device(), &pipelineLayoutInfo, NULL_ALLOC, &_pipelineLayout);
 
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -136,15 +143,15 @@ namespace vkw
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // assume no recreation
         pipelineInfo.basePipelineIndex = -1;
 
-        vkCreateGraphicsPipelines(_device.ptr->device(), VK_NULL_HANDLE, 1, &pipelineInfo, NULL_ALLOC, &_pipeline.handle);
+        vkCreateGraphicsPipelines(_device->device(), VK_NULL_HANDLE, 1, &pipelineInfo, NULL_ALLOC, &_pipeline);
     }
 
     GraphicsPipeline::~GraphicsPipeline()
     {
         if (_device)
         {
-            vkDestroyPipeline(_device.ptr->device(), _pipeline, NULL_ALLOC);
-            vkDestroyPipelineLayout(_device.ptr->device(), _pipelineLayout, NULL_ALLOC);
+            vkDestroyPipeline(_device->device(), _pipeline, NULL_ALLOC);
+            vkDestroyPipelineLayout(_device->device(), _pipelineLayout, NULL_ALLOC);
         }
     }
     

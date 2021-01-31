@@ -16,16 +16,11 @@ namespace vkw
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
 
-        vkCreateImageView(_device.ptr->device(), &viewInfo, NULL_ALLOC, &_view.handle);
+        vkCreateImageView(_device->device(), &viewInfo, NULL_ALLOC, &_view);
     }
 
     ImageView::~ImageView()
     {
-        if (_device) vkDestroyImageView(_device.ptr->device(), _view, NULL_ALLOC);
-    }
-
-    VkImageView ImageView::imageView() const
-    {
-        return _view;
+        if (_device) vkDestroyImageView(_device->device(), _view, NULL_ALLOC);
     }
 }

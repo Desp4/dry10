@@ -4,32 +4,31 @@
 
 namespace vkw
 {
-    Device::Device(VkPhysicalDevice physDevice, std::span<const uint32_t> queues,
+    Device::Device(VkPhysicalDevice physDevice, std::span<const QueueInfo> queueInfos,
         std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features) :
         _physDevice(physDevice)
     {
-        std::vector<VkDeviceQueueCreateInfo> queueInfos(queues.size());
-        const float priority = 1.0f;
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos(queueInfos.size());
 
-        for (int i = 0; i < queues.size(); ++i)
+        for (int i = 0; i < queueInfos.size(); ++i)
         {
-            queueInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            queueInfos[i].queueFamilyIndex = queues[i];
-            queueInfos[i].queueCount = 1;
-            queueInfos[i].pQueuePriorities = &priority;
-            queueInfos[i].flags = 0;
-            queueInfos[i].pNext = nullptr;
+            queueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfos[i].queueFamilyIndex = queueInfos[i].queueFamilyIndex;
+            queueCreateInfos[i].queueCount = queueInfos[i].queueCount;
+            queueCreateInfos[i].pQueuePriorities = queueInfos[i].priorities.data();
+            queueCreateInfos[i].flags = 0;
+            queueCreateInfos[i].pNext = nullptr;
         }
 
         VkDeviceCreateInfo deviceInfo{};
         deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        deviceInfo.pQueueCreateInfos = queueInfos.data();
-        deviceInfo.queueCreateInfoCount = queueInfos.size();
+        deviceInfo.pQueueCreateInfos = queueCreateInfos.data();
+        deviceInfo.queueCreateInfoCount = queueCreateInfos.size();
         deviceInfo.pEnabledFeatures = &features;
         deviceInfo.ppEnabledExtensionNames = extensions.data();
         deviceInfo.enabledExtensionCount = extensions.size();
         // layers deprecated, skipping
-        vkCreateDevice(_physDevice, &deviceInfo, NULL_ALLOC, &_device.handle);
+        vkCreateDevice(_physDevice, &deviceInfo, NULL_ALLOC, &_device);
     }
 
     Device::~Device()
@@ -37,9 +36,11 @@ namespace vkw
         vkDestroyDevice(_device, NULL_ALLOC);
     }
 
-    VkDevice Device::device() const
+    VkSurfaceCapabilitiesKHR Device::surfaceCapabilities(VkSurfaceKHR surface) const
     {
-        return _device;
+        VkSurfaceCapabilitiesKHR ret;
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_physDevice, surface, &ret);
+        return ret;
     }
 
     VkPhysicalDeviceMemoryProperties Device::memoryProperties() const

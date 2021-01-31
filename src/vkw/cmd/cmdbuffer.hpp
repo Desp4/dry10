@@ -19,7 +19,8 @@ namespace vkw
         ~CmdBuffer();
 
         void begin(VkCommandBufferUsageFlags usage);
-        const VkCommandBuffer& buffer() const;
+
+        const VkHandle<VkCommandBuffer>& buffer() const { return _buffer; }
 
     private:
         NullablePtr<const CmdPool> _pool;

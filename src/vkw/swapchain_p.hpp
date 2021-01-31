@@ -27,7 +27,7 @@ namespace vkw
         PresentFrame acquireFrame();
         void submitFrame(VkQueue queue, PresentFrame frame, const VkCommandBuffer* cmdBuffer);
 
-        const std::vector<ImageView>& swapViews() const;
+        const std::vector<ImageView>& swapViews() const { return _swapImageViews; }
 
     private:
         DevicePtr _device;

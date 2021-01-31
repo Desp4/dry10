@@ -2,13 +2,13 @@
 
 namespace vkw
 {
-    Buffer TransferQueue::createLocalBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data) const
+    Buffer TransferQueue::createLocalBuffer(const Device* device, VkDeviceSize size, VkBufferUsageFlags usage, const void* data) const
     {
-        Buffer stagingBuffer(_device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        Buffer stagingBuffer(device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         stagingBuffer.writeToMemory(data, size);
 
-        Buffer ret(_device, size,
+        Buffer ret(device, size,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         copyBuffer(stagingBuffer.buffer(), ret.buffer(), size);

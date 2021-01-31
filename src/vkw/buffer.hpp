@@ -16,8 +16,9 @@ namespace vkw
 
         // TODO : if local buffer has the same functionality as a non-local one keep it, if not separate the two into different structures
         void writeToMemory(const void* data, VkDeviceSize size);
-        const VkBuffer& buffer() const;
-        VkDeviceSize size() const;
+
+        const VkHandle<VkBuffer>& buffer() const { return _buffer; }
+        const VkDeviceSize& size() const { return _trueSize; }
 
     private:
         DevicePtr _device;

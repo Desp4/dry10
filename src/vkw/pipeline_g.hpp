@@ -1,11 +1,10 @@
 #pragma once
 
+#include "dab/import.hpp"
+
 #include "renderpass.hpp"
-#include "material.hpp"
-#include "framebuffer.hpp"
+#include "shader/shader.hpp"
 #include "desc/desclayout.hpp"
-#include "desc/descsets.hpp"
-#include "renderable.hpp"
 #include "cmd/cmdbuffer.hpp"
 
 namespace vkw
@@ -17,7 +16,8 @@ namespace vkw
 
         GraphicsPipeline() = default;
         GraphicsPipeline(GraphicsPipeline&&) = default;
-        GraphicsPipeline(const Device* device, const RenderPass* renderPass, const Material& material, VkExtent2D extent);
+        GraphicsPipeline(const Device* device, const RenderPass* renderPass, VkExtent2D extent,
+                         std::span<const ShaderModule> modules, const dab::ShaderVkData& shaderData, std::span<const VkDescriptorSetLayout> layouts);
         ~GraphicsPipeline();
 
         // TODO : perhaps split binding and drawing(one for pipeline, one for layout)
@@ -31,7 +31,6 @@ namespace vkw
         VkHandle<VkPipelineLayout> _pipelineLayout;
         VkHandle<VkPipeline> _pipeline;
         
-        bool _hasDepth;
         VkExtent2D _extent;
     };
 }

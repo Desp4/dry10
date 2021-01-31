@@ -8,14 +8,4 @@ namespace vkw
         _view(device, _image.image(), imgFormat, mipLvls, aspectFlags)
     {
     }
-
-    const Image& ImageViewPair::image() const
-    {
-        return _image;
-    }
-
-    const ImageView& ImageViewPair::view() const
-    {
-        return _view;
-    }
 }

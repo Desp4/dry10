@@ -18,12 +18,12 @@ namespace vkw
         bufferInfo.commandPool = _pool.ptr->pool();
         bufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         bufferInfo.commandBufferCount = 1;
-        vkAllocateCommandBuffers(_pool.ptr->_device.ptr->device(), &bufferInfo, &_buffer.handle);
+        vkAllocateCommandBuffers(_pool->_device->device(), &bufferInfo, &_buffer);
     }
 
     CmdBuffer::~CmdBuffer()
     {
-        if (_pool) vkFreeCommandBuffers(_pool.ptr->_device.ptr->device(), _pool.ptr->_pool, 1, &_buffer.handle);
+        if (_pool) vkFreeCommandBuffers(_pool->_device->device(), _pool->_pool, 1, &_buffer);
     }
 
     void CmdBuffer::begin(VkCommandBufferUsageFlags usage)
@@ -32,10 +32,5 @@ namespace vkw
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = usage;
         vkBeginCommandBuffer(_buffer, &beginInfo);
-    }
-
-    const VkCommandBuffer& CmdBuffer::buffer() const
-    {
-        return _buffer.handle;
     }
 }

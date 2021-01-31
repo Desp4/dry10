@@ -7,10 +7,10 @@ namespace vkw
     class DeviceMemory : public Movable<DeviceMemory>
     {
     public:
-        // Returns UINT32_MAX on failure
-        static uint32_t findMemoryTypeIndex(const Device& device, uint32_t typeFilter, VkMemoryPropertyFlags properties);
-
         using Movable<DeviceMemory>::operator=;
+
+        // returns UINT32_MAX on failure
+        static uint32_t findMemoryTypeIndex(const Device& device, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
         DeviceMemory() = default;
         DeviceMemory(DeviceMemory&&) = default;
@@ -19,8 +19,8 @@ namespace vkw
 
         void writeToMemory(const void* data, VkDeviceSize size);
 
-        VkDeviceMemory memory() const;
-        VkDeviceSize size() const;
+        const VkHandle<VkDeviceMemory>& memory() const { return _memory; }
+        const VkDeviceSize& size() const { return _size; }
 
     private:
         DevicePtr _device;

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "queue.hpp"
-#include "../buffer.hpp"
-#include "../image/image.hpp"
+#include "vkw/buffer.hpp"
+#include "vkw/image/image.hpp"
 
 namespace vkw
 {
@@ -11,12 +11,12 @@ namespace vkw
     public:
         using Queue::Queue;
 
-        Buffer createLocalBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data) const;
+        Buffer createLocalBuffer(const Device* device, VkDeviceSize size, VkBufferUsageFlags usage, const void* data) const;
 
         void copyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) const;
         void copyBufferToImage(VkBuffer buffer, const Image& image) const;
 
         // msvc doesn't recognize the constructor in base
-        TransferQueue& operator=(TransferQueue&& oth) { Queue::operator=(std::move(oth)); return *this; }
+        inline TransferQueue& operator=(TransferQueue&& oth) { Queue::operator=(std::move(oth)); return *this; }
     };
 }

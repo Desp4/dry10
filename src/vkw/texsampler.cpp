@@ -5,6 +5,7 @@ namespace vkw
     TexSampler::TexSampler(const Device* device, uint32_t mipLevels) :
         _device(device)
     {
+        // NOTE : some hardcoded values here
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -22,16 +23,11 @@ namespace vkw
         samplerInfo.mipLodBias = 0.0f;
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = mipLevels;
-        vkCreateSampler(_device.ptr->device(), &samplerInfo, NULL_ALLOC, &_sampler.handle);
+        vkCreateSampler(_device->device(), &samplerInfo, NULL_ALLOC, &_sampler);
     }
 
     TexSampler::~TexSampler()
     {
-        if (_device) vkDestroySampler(_device.ptr->device(), _sampler, NULL_ALLOC);
-    }
-
-    VkSampler TexSampler::sampler() const
-    {
-        return _sampler;
+        if (_device) vkDestroySampler(_device->device(), _sampler, NULL_ALLOC);
     }
 }

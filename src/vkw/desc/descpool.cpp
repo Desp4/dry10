@@ -10,12 +10,12 @@ namespace vkw
         poolInfo.maxSets = capacity;
         poolInfo.poolSizeCount = poolSizes.size();
         poolInfo.pPoolSizes = poolSizes.data();
-        vkCreateDescriptorPool(_device.ptr->device(), &poolInfo, NULL_ALLOC, &_pool.handle);
+        vkCreateDescriptorPool(_device->device(), &poolInfo, NULL_ALLOC, &_pool);
     }
 
     DescriptorPool::~DescriptorPool()
     {
-        if (_device) vkDestroyDescriptorPool(_device.ptr->device(), _pool, NULL_ALLOC);
+        if (_device) vkDestroyDescriptorPool(_device->device(), _pool, NULL_ALLOC);
     }
 
     DescriptorSets DescriptorPool::createSets(VkDescriptorSetLayout layout, uint32_t count) const
@@ -28,7 +28,7 @@ namespace vkw
         setInfo.descriptorPool = _pool;
         setInfo.descriptorSetCount = count;
         setInfo.pSetLayouts = layouts.data();
-        vkAllocateDescriptorSets(_device.ptr->device(), &setInfo, sets._sets.data());
+        vkAllocateDescriptorSets(_device->device(), &setInfo, sets.data());
         return sets;
     }
 
@@ -36,6 +36,6 @@ namespace vkw
     {
         for (auto& write : descriptorWrites)
             write.dstSet = set; // FUTURE : kinda dumb modifying the writes here idk, TODO : move it to descriptor?
-        vkUpdateDescriptorSets(_device.ptr->device(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+        vkUpdateDescriptorSets(_device->device(), descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
 }
