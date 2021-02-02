@@ -6,13 +6,7 @@
 
 namespace vkw
 {
-    // TODO : FUTURE : add recreate option
-    struct PresentFrame
-    {
-        uint32_t frameIndex;
-        uint32_t imageIndex;
-    };
-
+    // TODO : add recreate option
     class PresentSwapchain : public Movable<PresentSwapchain>
     {
     public:
@@ -21,11 +15,11 @@ namespace vkw
         PresentSwapchain() = default;
         PresentSwapchain(PresentSwapchain&&) = default;
         PresentSwapchain(const Device* device, VkSurfaceKHR surface, VkExtent2D extent, VkSurfaceTransformFlagBitsKHR transform,
-                         uint32_t imageCount, VkFormat format, VkColorSpaceKHR colorSpace, VkPresentModeKHR presentMode);
+                         uint32_t minImageCount, VkFormat format, VkColorSpaceKHR colorSpace, VkPresentModeKHR presentMode);
         ~PresentSwapchain();
 
-        PresentFrame acquireFrame();
-        void submitFrame(VkQueue queue, PresentFrame frame, const VkCommandBuffer* cmdBuffer);
+        uint32_t acquireFrame();
+        void submitFrame(VkQueue queue, uint32_t frameIndex, const VkCommandBuffer* cmdBuffer);
 
         const std::vector<ImageView>& swapViews() const { return _swapImageViews; }
 
@@ -36,7 +30,7 @@ namespace vkw
 
         // concurrent in flight frames and total frames in a swapchain are the same
         uint32_t _frameCount;
-        uint32_t _currentFrame;
+        uint32_t _nextFrame;
 
         std::vector<VkImage> _swapImages;
         std::vector<ImageView> _swapImageViews;

@@ -8,8 +8,8 @@ namespace gr
     class DryProgram
     {
     public:
-        constexpr static uint32_t DEFAULT_WIN_WIDTH  = 1280;
-        constexpr static uint32_t DEFAULT_WIN_HEIGHT = 720;
+        constexpr static uint32_t DEFAULT_WIN_WIDTH  = 720;
+        constexpr static uint32_t DEFAULT_WIN_HEIGHT = 480;
 
         DryProgram();
         DryProgram(uint32_t width, uint32_t height);

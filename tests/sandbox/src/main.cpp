@@ -22,7 +22,11 @@ public:
 
         _renderable = _resManager.createRenderable(material, mesh);
 
-        _ubo.proj = glm::perspective(glm::radians(80.0f), 1280.0f / 720.0f, 0.1f, 64.0f);
+        _ubo.proj = glm::perspective(
+            glm::radians(80.0f),
+            DryProgram::DEFAULT_WIN_WIDTH / float(DryProgram::DEFAULT_WIN_HEIGHT),
+            0.1f,
+            64.0f);
         _ubo.proj[1][1] *= -1;
         _ubo.model = glm::rotate(glm::mat4(1.0f), 0.0f, glm::vec3(0.0f, 1.0f, 0.0f));
     }
@@ -77,8 +81,7 @@ protected:
         if (_elapsed > 8.0f && _flag2)
         {
             _flag2 = false;
-            // TODO : this. won't work, need cmd buffer sync
-            //_resManager.destroyRenderable(_renderable);
+            _resManager.destroyRenderable(_renderable);
         }
     }
 

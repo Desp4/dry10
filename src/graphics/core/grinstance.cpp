@@ -37,6 +37,7 @@ namespace gr::core
     {
         const auto physDevices = _instance.enumeratePhysicalDevices();
         VkPhysicalDevice physDevice = VK_NULL_HANDLE;
+        // NOTE : requested settings or bust, can write a few lines to have fallback options
         for (const auto device : physDevices)
         {
             if (vkw::conf::deviceExtensionsSupport(device, deviceExtensions) &&

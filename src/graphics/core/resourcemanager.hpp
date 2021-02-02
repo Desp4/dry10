@@ -47,23 +47,21 @@ namespace gr::core
 
         struct Renderable
         {
-            VkHash meshID;
             // NOTE : doing only combined samplers for now
             std::vector<VkHash> samplerIDs;
-
             // TODO : can be arrays, should be known at compile time after got the shader data
-            // number of ubos per frame
-            uint32_t uboCount;
             // 2d ubo array like this: ubo1_frame1, ubo2_frame1 ..., ubo1_frame2 ...
             std::vector<vkw::Buffer> ubos;
             vkw::DescriptorSets descriptors;
+            // number of ubos per frame
+            uint32_t uboCount;
+            VkHash meshID;
 
             VkHash hash() const
             {
                 return descriptors[0];
             }
         };
-
         struct MeshData
         {
             vkw::Buffer vertexBuffer;
@@ -74,7 +72,6 @@ namespace gr::core
                 return vertexBuffer.buffer().handle;
             }
         };
-
         struct CombinedSamplerData
         {
             vkw::ImageViewPair texture;
@@ -84,6 +81,18 @@ namespace gr::core
             {
                 return sampler.sampler().handle;
             }
+        };
+        struct RenderableGroup
+        {
+            vkw::GraphicsPipeline pipeline;
+            VkHashTable<Renderable> renderables;
+            uint32_t trueSize;
+        };
+        struct DeletedRenderable
+        {
+            Renderable renderable;
+            VkHash parentGroupHash;
+            uint8_t expireCount;
         };
 
         constexpr static uint32_t POOL_CAPACITY = 512;
@@ -109,7 +118,7 @@ namespace gr::core
 
         Renderer _renderer;
 
-        std::pair<vkw::PresentFrame, const vkw::CmdBuffer*> _currentFrame;
+        RenderContext _currentFrameCtx;
 
         // TODO : hashing vk internal pointers => all unique
         // TODO : TODO : use a hash table for unique val lookup which doesn't construct the structure
@@ -126,7 +135,9 @@ namespace gr::core
         VkHashTable<std::pair<uint32_t, CombinedSamplerData>> _combinedSamplers;
 
         // vkHash is the same as in shaderLookup
-        VkHashTable<std::pair<vkw::GraphicsPipeline, VkHashTable<Renderable>>> _renderables;
+        VkHashTable<RenderableGroup> _renderables;
+        // renderable deletion queue, NOTE : just a vector for now
+        std::vector<DeletedRenderable> _deletedRenderables;
 
         // hash tables for public access
         // when deleting entries have to manually erase a lookup value by searching through those

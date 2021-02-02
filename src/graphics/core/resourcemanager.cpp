@@ -2,6 +2,8 @@
 
 #include "dbg/log.hpp"
 
+#include <algorithm>
+
 namespace gr::core
 {
     ResourceManager::ResourceManager(const GraphicsInstance& instance) :
@@ -19,36 +21,54 @@ namespace gr::core
     RenderableHandle ResourceManager::createRenderable(const Material& material, const asset::MeshAsset& mesh)
     {
         dab::ShaderVkData vkShaderData = material.shader->vkData();
+        // sort so that ubo indexing is in increasing binding value
+        std::sort(vkShaderData.bufferInfos.begin(), vkShaderData.bufferInfos.end(),
+            [&bindTable = vkShaderData.layoutBindings](auto&& l, auto&& r)
+            {
+                return bindTable[l.layoutBindingInd].binding < bindTable[r.layoutBindingInd].binding;
+            }
+        );
+
         VkDescriptorSetLayout layout;
         VkHashTable<Renderable>* renderableTable;
 
         Renderable renderable;
 
+        LOG_DBG("creating renderable[init raw %p;%p]", &material, &mesh);
+
         // check descriptors
         if (!_shaderLookup.contains(material.shader->hash))
         {
+            LOG_DBG("shader[public hash %s] not registered, creating a pipeline", material.shader->hash.c_str());
+
             vkw::DescriptorLayout descLayout(_device, vkShaderData.layoutBindings);
             layout = descLayout.layout().handle;
 
             // create pipeline
             renderableTable = &_renderables.emplace(layout,
-                std::pair{ _renderer.createPipeline(material, descLayout), VkHashTable<Renderable>{} })
-                .first->second.second;
+                RenderableGroup{ _renderer.createPipeline(material, descLayout), VkHashTable<Renderable>{}, 1 })
+                .first->second.renderables;
 
             _descriptorLayouts.emplace(layout, std::move(descLayout));
             _shaderLookup.emplace(material.shader->hash, layout);
         }
         else
         {
+            LOG_DBG("shader[public hash %s] registered, binding object", material.shader->hash.c_str());
+            
             const VkHash shaderHash = _shaderLookup[material.shader->hash];
             layout = _descriptorLayouts[shaderHash].layout();
 
-            renderableTable = &_renderables[shaderHash].second;
+            auto& renderableGroup = _renderables[shaderHash];
+            renderableGroup.trueSize += 1;
+            renderableTable = &renderableGroup.renderables;
         }
 
         // check meshes
         if (!_meshLookup.contains(mesh.hash))
         {
+            LOG_DBG("mesh[public hash %s] not registered, allocating buffers", mesh.hash.c_str());
+
             MeshData newMesh;
             newMesh.indexBuffer = _transferQueue.createLocalBuffer(
                 _device,
@@ -67,6 +87,8 @@ namespace gr::core
         }
         else
         {
+            LOG_DBG("mesh[public hash %s] registered, binding object", mesh.hash.c_str());
+
             renderable.meshID = _meshLookup[mesh.hash];
             _meshBuffers[renderable.meshID].first += 1;
         }
@@ -81,8 +103,9 @@ namespace gr::core
         {
             if (!_combinedSamplerLookup.contains(texture->hash))
             {
-                CombinedSamplerData combinedSampler;
+                LOG_DBG("texture[public hash %s] not registered, allocating combined sampler", texture->hash.c_str());
 
+                CombinedSamplerData combinedSampler;
                 const uint32_t mipLevels = std::log2(std::max<uint32_t>(texture->width, texture->height));
 
                 vkw::Buffer stagingBuffer{
@@ -119,6 +142,8 @@ namespace gr::core
             }
             else
             {
+                LOG_DBG("texture[public hash %s] registered, binding object", texture->hash.c_str());
+
                 const VkHash samplerHash = _combinedSamplerLookup[texture->hash];
                 _combinedSamplers[samplerHash].first += 1;
 
@@ -127,11 +152,11 @@ namespace gr::core
         }
 
         // TODO : assume layoutBinding descriptor types are present in a pool, see compile time reflection
-        renderable.descriptors = _descPool.createSets(layout, Renderer::IMAGE_COUNT);
+        renderable.descriptors = _descPool.createSets(layout, _renderer.imageCount());
         // create ubos for each frame image
         renderable.uboCount = vkShaderData.bufferInfos.size();
-        renderable.ubos.resize(renderable.uboCount * Renderer::IMAGE_COUNT);
-        for (int i = 0; i < Renderer::IMAGE_COUNT; ++i)
+        renderable.ubos.resize(renderable.uboCount * _renderer.imageCount());
+        for (int i = 0; i < _renderer.imageCount(); ++i)
         {
             for (int j = 0; j < renderable.uboCount; ++j)
             {
@@ -171,7 +196,7 @@ namespace gr::core
             descWrites[imageInfoPair.layoutBindingInd].pImageInfo = &imageInfoPair.info;
         }
 
-        for (int i = 0; i < Renderer::IMAGE_COUNT; ++i)
+        for (int i = 0; i < _renderer.imageCount(); ++i)
         {
             // cycle through each possible uniform data type and set descWrites pointer for that type
             // needed only for types that have frame dependent data, for now only ubos
@@ -189,86 +214,116 @@ namespace gr::core
         const RenderableHandle retHandle = { layout, renderable.hash() };
 
         renderableTable->emplace(renderable.hash(), std::move(renderable));
+        LOG_DBG("renderable[handle %p;%p] created", retHandle.first, retHandle.second);
 
         return retHandle;
     }
-    // TODO : need to use a cleanup process that waits for all frames to finish and delete after them
+
     void ResourceManager::destroyRenderable(RenderableHandle handle)
     {
         auto pipelineGroupIt = _renderables.find(handle.first);
-        auto renderableIt = pipelineGroupIt->second.second.find(handle.second);
+        auto renderableIt = pipelineGroupIt->second.renderables.find(handle.second);
 
-        // remove mesh
-        auto meshIt = _meshBuffers.find(renderableIt->second.meshID);
-        meshIt->second.first -= 1;
-        if (meshIt->second.first == 0)
-        {
-            // safe to erase right ahead, also O(n), same for other public lookup
-            _meshLookup.erase(
-                std::find_if(_meshLookup.begin(), _meshLookup.end(),
-                    [meshIt](auto&& val) { return val.second == meshIt->first; }));
-            _meshBuffers.erase(meshIt);
-        }        
+        _deletedRenderables.emplace_back(std::move(renderableIt->second), handle.first, 1);
+        pipelineGroupIt->second.renderables.erase(renderableIt);
 
-        // remove images
-        for (VkHash samplerID : renderableIt->second.samplerIDs)
-        {
-            auto samplerIt = _combinedSamplers.find(samplerID);
-            samplerIt->second.first -= 1;
-            if (samplerIt->second.first == 0)
-            {
-                _combinedSamplerLookup.erase(
-                    std::find_if(_combinedSamplerLookup.begin(), _combinedSamplerLookup.end(),
-                        [samplerIt](auto&& val) { return val.second == samplerIt->first; }));
-                _combinedSamplers.erase(samplerIt);
-            }
-        }
-
-        pipelineGroupIt->second.second.erase(renderableIt);
-        // NOTE : if no renderables also delete pipeline, perhaps you wouldn't want to do that
-        if (pipelineGroupIt->second.second.size() == 0)
-        {
-            _shaderLookup.erase(
-                std::find_if(_shaderLookup.begin(), _shaderLookup.end(),
-                    [handle](auto&& val) { return val.second == handle.first; }));
-
-            _descriptorLayouts.erase(handle.first);
-            _renderables.erase(pipelineGroupIt);
-        }
+        LOG_DBG("renderable[handle %p;%p] deleted", handle.first, handle.second);
     }
 
     void ResourceManager::writeToUniformBuffer(RenderableHandle handle, uint32_t index, const void* data, uint32_t size)
     {
-        Renderable& renderable = _renderables[handle.first].second[handle.second];
-        renderable.ubos[_currentFrame.first.frameIndex * renderable.uboCount + index].writeToMemory(data, size);
+        Renderable& renderable = _renderables[handle.first].renderables[handle.second];
+        renderable.ubos[_currentFrameCtx.frameIndex * renderable.uboCount + index].writeToMemory(data, size);
     }
 
     void ResourceManager::advanceFrame()
     {
-        _currentFrame = _renderer.beginFrame();
+        _currentFrameCtx = _renderer.beginFrame();
+
+        // update deleted resources, in this place can't be async due to races in logic stage
+        // NOTE : append and delete not ideal in a vector, maybe a ringbuffer or some other FIFO structure
+        for (auto p = _deletedRenderables.begin(); p != _deletedRenderables.end();)
+        {
+            p->expireCount += 1;
+            if (p->expireCount != _renderer.imageCount())
+            {
+                ++p;
+            }
+            else
+            {
+                LOG_DBG("renderable[handle %p;%p] freed", p->parentGroupHash, p->renderable.hash());
+
+                auto parentGroup = _renderables.find(p->parentGroupHash);
+                parentGroup->second.trueSize -= 1;
+
+                // check if need to unload resources
+                // meshes
+                auto meshIt = _meshBuffers.find(p->renderable.meshID);
+                meshIt->second.first -= 1;
+                if (meshIt->second.first == 0)
+                {
+                    LOG_DBG("mesh[hash %p] unused, freeing", p->renderable.meshID);
+                    // safe to erase right ahead, also O(n), same for other public lookup
+                    _meshLookup.erase(
+                        std::find_if(_meshLookup.begin(), _meshLookup.end(),
+                            [meshIt](auto&& val) { return val.second == meshIt->first; }));
+                    _meshBuffers.erase(meshIt);
+                }
+
+                // images
+                for (VkHash samplerID : p->renderable.samplerIDs)
+                {
+                    auto samplerIt = _combinedSamplers.find(samplerID);
+                    samplerIt->second.first -= 1;
+                    if (samplerIt->second.first == 0)
+                    {
+                        LOG_DBG("texture[hash %p] unused, freeing", samplerID);
+
+                        _combinedSamplerLookup.erase(
+                            std::find_if(_combinedSamplerLookup.begin(), _combinedSamplerLookup.end(),
+                                [samplerIt](auto&& val) { return val.second == samplerIt->first; }));
+                        _combinedSamplers.erase(samplerIt);
+                    }
+                }
+
+                // pipeline
+                if (parentGroup->second.trueSize == 0)
+                {
+                    LOG_DBG("pipeline[hash %p] unused, destroying", p->parentGroupHash);
+                    _shaderLookup.erase(
+                        std::find_if(_shaderLookup.begin(), _shaderLookup.end(),
+                            [handle = p->parentGroupHash](auto&& val) { return val.second == handle; }));
+
+                    _descriptorLayouts.erase(p->parentGroupHash);
+                    _renderables.erase(parentGroup);
+                }
+
+                p = _deletedRenderables.erase(p);
+            }
+        }
     }
 
     void ResourceManager::submitFrame()
     {
         VkDeviceSize offsets[1]{ 0 };
-        const auto& cmdBuffer = _currentFrame.second->buffer();
-        const uint32_t frameIndex = _currentFrame.first.frameIndex;
+        const auto& cmdBuffer = _currentFrameCtx.cmdBuffer->buffer();
 
         for (const auto& rendPair : _renderables)
         {
-            rendPair.second.first.bindPipeline(cmdBuffer);
+            rendPair.second.pipeline.bindPipeline(cmdBuffer);
 
-            for (const auto& renderable : rendPair.second.second)
+            for (const auto& renderable : rendPair.second.renderables)
             {
                 const auto& meshData = _meshBuffers[renderable.second.meshID].second;
 
                 vkCmdBindVertexBuffers(cmdBuffer, 0, 1, &meshData.vertexBuffer.buffer(), offsets);
                 vkCmdBindIndexBuffer(cmdBuffer, meshData.indexBuffer.buffer(), 0, VK_INDEX_TYPE_UINT32);
-                rendPair.second.first.bindDescriptorSets(cmdBuffer, std::span{ renderable.second.descriptors.data() + frameIndex, 1 });
+                rendPair.second.pipeline.bindDescriptorSets(
+                    cmdBuffer, std::span{ renderable.second.descriptors.data() + _currentFrameCtx.frameIndex, 1 });
                 vkCmdDrawIndexed(cmdBuffer, meshData.indexBuffer.size() / sizeof(uint32_t), 1, 0, 0, 0);
             }
         }
 
-        _renderer.submitFrame(_currentFrame.first);
+        _renderer.submitFrame(_currentFrameCtx.frameIndex);
     }
 }
