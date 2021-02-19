@@ -6,42 +6,20 @@
 
 #define NULL_ALLOC nullptr
 
-namespace vkw
-{
-    using util::Movable;
-    using util::NullablePtr;
+namespace dry::vkw {
 
-    template<typename T>
-    struct VkHandle
-    {
-        T handle;
+using util::movable;
+using util::nullable_ptr;
 
-        VkHandle() : handle(VK_NULL_HANDLE) {}
-        explicit VkHandle(T oth) : handle(oth) {}
-        VkHandle(VkHandle&& oth) : handle(oth.handle)
-        {
-            oth.handle = VK_NULL_HANDLE;
-        }
+template<typename T>
+struct vk_handle : public util::nullable_base<T, static_cast<T>(VK_NULL_HANDLE)> {
+    using util::nullable_base<T, static_cast<T>(VK_NULL_HANDLE)>::nullable_base;
 
-        operator T() const { return handle; }
+    vk_handle(const vk_handle&) = delete;
+    vk_handle(vk_handle&&) = default;
 
-        const T* operator&() const { return &handle; }
-        T* operator&() { return &handle; }
+    vk_handle& operator=(const vk_handle&) = delete;
+    vk_handle& operator=(vk_handle&&) = default;
+};
 
-        VkHandle& operator=(VkHandle&& oth)
-        {
-            handle = oth.handle;
-            oth.handle = VK_NULL_HANDLE;
-            return *this;
-        }
-
-        VkHandle& operator=(T oth)
-        {
-            handle = oth;
-            return *this;
-        }
-
-        VkHandle(const VkHandle&) = delete;
-        VkHandle& operator=(const VkHandle&) = delete;
-    };
 }

@@ -1,26 +1,24 @@
 #pragma once
 
-#include "vkw/device/device.hpp"
+#include "vkw/vkw.hpp"
 
-namespace vkw
-{
-    class CmdPool : public Movable<CmdPool>
-    {
-    public:
-        using Movable<CmdPool>::operator=;
+namespace dry::vkw {
 
-        CmdPool() = default;
-        CmdPool(CmdPool&&) = default;
-        CmdPool(const Device* device, uint32_t queue);
-        ~CmdPool();
+class cmd_pool : public movable<cmd_pool> {
+public:
+    using movable<cmd_pool>::operator=;
 
-        const VkHandle<VkCommandPool>& pool() const { return _pool; }
+    cmd_pool() = default;
+    cmd_pool(cmd_pool&&) = default;
+    cmd_pool(uint32_t queue);
+    ~cmd_pool();
 
-    private:
-        friend class CmdBuffer;
+    const VkCommandPool& pool() const {
+        return _pool;
+    }
 
-        DevicePtr _device;
+private:
+    vk_handle<VkCommandPool> _pool;
+};
 
-        VkHandle<VkCommandPool> _pool;
-    };
 }

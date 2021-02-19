@@ -1,24 +1,24 @@
 #pragma once
 
-#include "device/device.hpp"
+#include "vkw.hpp"
 
-namespace vkw
-{
-    class TexSampler : public Movable<TexSampler>
-    {
-    public:
-        using Movable<TexSampler>::operator=;
+namespace dry::vkw {
 
-        TexSampler() = default;
-        TexSampler(TexSampler&&) = default;
-        TexSampler(const Device* device, uint32_t mipLevels);
-        ~TexSampler();
+class tex_sampler : public movable<tex_sampler> {
+public:
+    using movable<tex_sampler>::operator=;
 
-        const VkHandle<VkSampler>& sampler() const { return _sampler; }
+    tex_sampler() = default;
+    tex_sampler(tex_sampler&&) = default;
+    tex_sampler(uint32_t mip_levels);
+    ~tex_sampler();
 
-    private:
-        DevicePtr _device;
+    const VkSampler& sampler() const {
+        return _sampler;
+    }
 
-        VkHandle<VkSampler> _sampler;
-    };
+private:
+    vk_handle<VkSampler> _sampler;
+};
+
 }

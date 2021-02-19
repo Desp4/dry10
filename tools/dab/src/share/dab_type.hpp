@@ -1,6 +1,7 @@
 #pragma once
 
-namespace dab
-{
-    constexpr const char FILE_MAGIC[] = "DAB";
+namespace dab {
+
+constexpr const char FILE_MAGIC[] = { 'D', 'A', 'B' };
+
 }

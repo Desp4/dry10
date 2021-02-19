@@ -2,29 +2,31 @@
 
 #include "memory.hpp"
 
-namespace vkw
-{
-    class Buffer : public Movable<Buffer>
-    {
-    public:
-        using Movable<Buffer>::operator=;
+namespace dry::vkw {
 
-        Buffer() = default;
-        Buffer(Buffer&&) = default;
-        Buffer(const Device* device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
-        ~Buffer();
+class buffer_base : public movable<buffer_base> {
+public:
+    using movable<buffer_base>::operator=;
 
-        // TODO : if local buffer has the same functionality as a non-local one keep it, if not separate the two into different structures
-        void writeToMemory(const void* data, VkDeviceSize size);
+    buffer_base() = default;
+    buffer_base(buffer_base&&) = default;
+    buffer_base(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
+    ~buffer_base();
 
-        const VkHandle<VkBuffer>& buffer() const { return _buffer; }
-        const VkDeviceSize& size() const { return _trueSize; }
+    // TODO : if local buffer has the same functionality as a non-local one keep it, if not separate the two into different structures
+    void write(const void* data, VkDeviceSize size);
 
-    private:
-        DevicePtr _device;
+    const VkBuffer& buffer() const {
+        return _buffer;
+    }
+    const VkDeviceSize& size() const {
+        return _true_size;
+    }
 
-        VkHandle<VkBuffer> _buffer;
-        DeviceMemory _memory;
-        VkDeviceSize _trueSize;
-    };
+private:
+    vk_handle<VkBuffer> _buffer;
+    device_memory _memory;
+    VkDeviceSize _true_size;
+};
+
 }

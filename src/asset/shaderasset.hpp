@@ -1,17 +1,17 @@
 #pragma once
 
-#include "dab/import.hpp"
+#include "asset.hpp"
 
-namespace asset
-{
-    struct ShaderAsset : public dab::Shader
-    {
-        using type = dab::Shader;
+namespace dry::asset {
 
-        ShaderAsset() = default;
-        ShaderAsset(dab::Shader&& data, const std::string& assetHash);
-        ShaderAsset(const dab::Shader& data, const std::string& assetHash);
+struct shader_asset : public asset_base<dab::shader>, public dab::shader {
+    using asset_base<dab::shader>::hash;
 
-        const std::string hash;
-    };
+    shader_asset() = default;
+    shader_asset(type_t&& data, size_t asset_hash) :
+        asset_base(asset_hash), dab::shader(std::move(data)) {}
+    shader_asset(const type_t& data, size_t asset_hash) :
+        asset_base(asset_hash), dab::shader(data) {}
+};
+
 }

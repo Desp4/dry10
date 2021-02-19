@@ -1,23 +1,24 @@
 #include "queue.hpp"
+#include "vkw/device/device.hpp"
 
-namespace vkw
+namespace dry::vkw {
+
+queue_base::queue_base(uint32_t queue_family_index, uint32_t queue_index) :
+    _pool(queue_family_index)
 {
-    Queue::Queue(const Device* device, uint32_t queueFamilyIndex, uint32_t queueIndex) :
-        _pool(device, queueFamilyIndex)
-    {
-        vkGetDeviceQueue(device->device(), queueFamilyIndex, queueIndex, &_queue);
-    }
+    vkGetDeviceQueue(device_main::device(), queue_family_index, queue_index, &_queue);
+}
 
-    void Queue::submitCmd(VkCommandBuffer cmdBuffer) const
-    {
-        vkEndCommandBuffer(cmdBuffer);
+void queue_base::submit_cmd(VkCommandBuffer cmd_buf) const {
+    vkEndCommandBuffer(cmd_buf);
 
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &cmdBuffer;
+    VkSubmitInfo submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &cmd_buf;
 
-        vkQueueSubmit(_queue, 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(_queue); // NOTE : waiting here, perhaps not needed in some cases
-    }
+    vkQueueSubmit(_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vkQueueWaitIdle(_queue); // NOTE : waiting here, perhaps not needed in some cases
+}
+
 }

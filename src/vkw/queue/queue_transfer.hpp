@@ -4,19 +4,22 @@
 #include "vkw/buffer.hpp"
 #include "vkw/image/image.hpp"
 
-namespace vkw
-{
-    class TransferQueue : public Queue
-    {
-    public:
-        using Queue::Queue;
+namespace dry::vkw {
 
-        Buffer createLocalBuffer(const Device* device, VkDeviceSize size, VkBufferUsageFlags usage, const void* data) const;
+class queue_transfer : public queue_base {
+public:
+    using queue_base::queue_base;
 
-        void copyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) const;
-        void copyBufferToImage(VkBuffer buffer, const Image& image) const;
+    buffer_base create_local_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data) const;
 
-        // msvc doesn't recognize the constructor in base
-        inline TransferQueue& operator=(TransferQueue&& oth) { Queue::operator=(std::move(oth)); return *this; }
-    };
+    void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) const;
+    void copy_buffer_to_image(VkBuffer buffer, const image_base& image) const;
+
+    // NOTE: msvc doesn't recognize the assignment in base
+    queue_transfer& operator=(queue_transfer&& oth) {
+        queue_base::operator=(std::move(oth));
+        return *this;
+    }
+};
+
 }

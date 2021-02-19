@@ -1,34 +1,37 @@
 #pragma once
 
-#include "vkw/device/device.hpp"
+#include <span>
 
-namespace vkw
-{
-    enum class ShaderType : uint32_t
-    {
-        Vertex = VK_SHADER_STAGE_VERTEX_BIT,
-        Geometry = VK_SHADER_STAGE_GEOMETRY_BIT,
-        Fragment = VK_SHADER_STAGE_FRAGMENT_BIT,
-        Compute = VK_SHADER_STAGE_COMPUTE_BIT
-    };
+#include "vkw/vkw.hpp"
 
-    class ShaderModule : public Movable<ShaderModule>
-    {
-    public:
-        using Movable<ShaderModule>::operator=;
+namespace dry::vkw {
 
-        ShaderModule() = default;
-        ShaderModule(ShaderModule&&) = default;
-        ShaderModule(const Device* device, std::span<const uint32_t> bin, ShaderType type);
-        ~ShaderModule();
+enum class shader_type : uint32_t {
+    vertex   = VK_SHADER_STAGE_VERTEX_BIT,
+    geometry = VK_SHADER_STAGE_GEOMETRY_BIT,
+    fragment = VK_SHADER_STAGE_FRAGMENT_BIT,
+    compute  = VK_SHADER_STAGE_COMPUTE_BIT
+};
 
-        const VkHandle<VkShaderModule>& shaderModule() const { return _module; }
-        const ShaderType& type() const { return _type; }
+class shader_module : public movable<shader_module> {
+public:
+    using movable<shader_module>::operator=;
 
-    private:
-        DevicePtr _device;
+    shader_module() = default;
+    shader_module(shader_module&&) = default;
+    shader_module(std::span<const uint32_t> bin, shader_type type);
+    ~shader_module();
 
-        VkHandle<VkShaderModule> _module;
-        ShaderType _type;
-    };
+    const VkShaderModule& sh_module() const {
+        return _module;
+    }
+    const shader_type& type() const {
+        return _type;
+    }
+
+private:
+    vk_handle<VkShaderModule> _module;
+    shader_type _type;
+};
+
 }

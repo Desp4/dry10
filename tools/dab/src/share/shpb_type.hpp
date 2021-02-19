@@ -2,16 +2,16 @@
 
 #include <cstdint>
 
-namespace shpb
-{
-    enum ShaderType : uint8_t
-    {
-        Shader_None     = 0x00,
-        Shader_Vertex   = 0x01,
-        Shader_Fragment = 0x10,
-        Shader_Geometry = 0x08,
-        Shader_Compute  = 0x20
-    };
+namespace shpb {
+    
+enum class shader_type : uint8_t {
+    none = 0x00,
+    vertex = 0x01,
+    fragment = 0x10,
+    geometry = 0x08,
+    compute = 0x20
+};
 
-    constexpr const char FILE_MAGIC[] = "SHPB";
+constexpr const char FILE_MAGIC[] = { 'S', 'H', 'B', 'P' };
+
 }

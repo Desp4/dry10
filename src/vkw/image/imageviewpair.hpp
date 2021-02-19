@@ -1,25 +1,32 @@
 #pragma once
 
+#include "image.hpp"
 #include "imageview.hpp"
 
-namespace vkw
-{
-    class ImageViewPair : public Movable<ImageViewPair>
-    {
-    public:
-        using Movable<ImageViewPair>::operator=;
+namespace dry::vkw {
 
-        ImageViewPair() = default;
-        ImageViewPair(ImageViewPair&&) = default;
-        ImageViewPair(const Device* device, VkExtent2D dimensions, uint32_t mipLvls, VkSampleCountFlagBits samples, VkFormat imgFormat,
-                      VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageAspectFlags aspectFlags);
-        ~ImageViewPair() = default;
+class image_view_pair : public movable<image_view_pair> {
+public:
+    using movable<image_view_pair>::operator=;
 
-        const Image& image() const { return _image; }
-        const ImageView& view() const { return _view; }
+    image_view_pair() = default;
+    image_view_pair(image_view_pair&&) = default;
+    image_view_pair(VkExtent2D dimensions, uint32_t mip_lvls, VkSampleCountFlagBits samples,
+        VkFormat img_format, VkImageTiling tiling, VkImageUsageFlags usage,
+        VkMemoryPropertyFlags properties, VkImageAspectFlags aspect_flags) :
+        _image(dimensions, mip_lvls, samples, img_format, tiling, usage, properties),
+        _view(_image.image(), img_format, mip_lvls, aspect_flags) {}
 
-    private:
-        Image _image;
-        ImageView _view;
-    };
+    const image_base& image() const {
+        return _image;
+    }
+    const image_view& view() const {
+        return _view;
+    }
+
+private:
+    image_base _image;
+    image_view _view;
+};
+
 }

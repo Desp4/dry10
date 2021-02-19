@@ -1,21 +1,21 @@
 #include "shader.hpp"
+#include "vkw/device/device.hpp"
 
-namespace vkw
+namespace dry::vkw {
+
+shader_module::shader_module(std::span<const uint32_t> bin, shader_type type) :
+    _type(type)
 {
-    ShaderModule::ShaderModule(const Device* device, std::span<const uint32_t> bin, ShaderType type) :
-        _device(device),
-        _type(type)
-    {
-        VkShaderModuleCreateInfo shaderInfo{};
-        shaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        shaderInfo.codeSize = bin.size() * sizeof(uint32_t);
-        shaderInfo.pCode = bin.data();
+    VkShaderModuleCreateInfo shader_info{};
+    shader_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    shader_info.codeSize = bin.size() * sizeof(uint32_t);
+    shader_info.pCode = bin.data();
 
-        vkCreateShaderModule(_device->device(), &shaderInfo, NULL_ALLOC, &_module);
-    }
+    vkCreateShaderModule(device_main::device(), &shader_info, NULL_ALLOC, &_module);
+}
 
-    ShaderModule::~ShaderModule()
-    {
-        if (_device) vkDestroyShaderModule(_device->device(), _module, NULL_ALLOC);
-    }
+shader_module::~shader_module() {
+    vkDestroyShaderModule(device_main::device(), _module, NULL_ALLOC);
+}
+
 }

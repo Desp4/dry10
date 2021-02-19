@@ -3,27 +3,23 @@
 #include <glm/vec3.hpp>
 #include <glm/vec2.hpp>
 
-#include "dab/import.hpp"
+#include "asset.hpp"
 
-namespace asset
-{
-    struct MeshAsset
-    {
-        struct VertexData
-        {
-            // NOTE : keep alignment in mind
-            glm::vec3 pos;
-            glm::vec2 uv;
-        };
+namespace dry::asset {
 
-        using type = dab::Mesh;
-
-        MeshAsset() = default;
-        MeshAsset(const type& data, const std::string& assetHash);
-
-        std::vector<uint32_t> indices;
-        std::vector<VertexData> vertices;
-
-        const std::string hash;
+struct mesh_asset : public asset_base<dab::mesh> {
+    using asset_base<dab::mesh>::hash;
+    struct vertex_data {
+        // NOTE : keep alignment in mind
+        glm::vec3 pos;
+        glm::vec2 uv;
     };
+
+    mesh_asset() = default;
+    mesh_asset(const type_t& data, size_t asset_hash);
+
+    std::vector<uint32_t> indices;
+    std::vector<vertex_data> vertices;
+};
+
 }

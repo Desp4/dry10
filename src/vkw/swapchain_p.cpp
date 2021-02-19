@@ -1,122 +1,122 @@
 #include "swapchain_p.hpp"
+#include "device/device.hpp"
 
-namespace vkw
+namespace dry::vkw {
+
+swapchain_present::swapchain_present(VkSurfaceKHR surface, VkExtent2D extent, VkSurfaceTransformFlagBitsKHR transform,
+    uint32_t min_image_count, VkFormat format, VkColorSpaceKHR color_space, VkPresentModeKHR present_mode) :
+    _next_frame(0)
 {
-    PresentSwapchain::PresentSwapchain(const Device* device, VkSurfaceKHR surface, VkExtent2D extent, VkSurfaceTransformFlagBitsKHR transform, 
-                                       uint32_t minImageCount, VkFormat format, VkColorSpaceKHR colorSpace, VkPresentModeKHR presentMode) :
-        _device(device),
-        _nextFrame(0)
-    {
-        VkSwapchainCreateInfoKHR swapchainInfo{};
-        swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-        swapchainInfo.surface = surface;
-        swapchainInfo.minImageCount = minImageCount;
-        swapchainInfo.imageFormat = format;
-        swapchainInfo.imageColorSpace = colorSpace;
-        swapchainInfo.imageExtent = extent;
-        swapchainInfo.imageArrayLayers = 1;
-        swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        swapchainInfo.preTransform = transform;
-        swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        swapchainInfo.presentMode = presentMode;
-        swapchainInfo.clipped = VK_TRUE;
-        swapchainInfo.oldSwapchain = VK_NULL_HANDLE;
+    VkSwapchainCreateInfoKHR swapchain_info{};
+    swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    swapchain_info.surface = surface;
+    swapchain_info.minImageCount = min_image_count;
+    swapchain_info.imageFormat = format;
+    swapchain_info.imageColorSpace = color_space;
+    swapchain_info.imageExtent = extent;
+    swapchain_info.imageArrayLayers = 1;
+    swapchain_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_info.preTransform = transform;
+    swapchain_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    swapchain_info.presentMode = present_mode;
+    swapchain_info.clipped = VK_TRUE;
+    swapchain_info.oldSwapchain = VK_NULL_HANDLE;
 
-        vkCreateSwapchainKHR(_device->device(), &swapchainInfo, NULL_ALLOC, &_swapchain);
+    vkCreateSwapchainKHR(device_main::device(), &swapchain_info, NULL_ALLOC, &_swapchain);
 
-        // Create images and their fences
-        vkGetSwapchainImagesKHR(_device->device(), _swapchain, &_frameCount, nullptr);
-        _swapImages.resize(_frameCount);
-        _swapImageViews.resize(_frameCount);
-        _inFlightImageFences.resize(_frameCount, VK_NULL_HANDLE);
+    // Create images and their fences
+    vkGetSwapchainImagesKHR(device_main::device(), _swapchain, &_frame_count, nullptr);
+    _swap_images.resize(_frame_count);
+    _swap_image_views.resize(_frame_count);
+    _in_flight_image_fences.resize(_frame_count, VK_NULL_HANDLE);
 
-        vkGetSwapchainImagesKHR(_device->device(), _swapchain, &_frameCount, _swapImages.data());
-        for (int i = 0; i < _frameCount; ++i)
-            _swapImageViews[i] = ImageView(_device, _swapImages[i], format, 1, VK_IMAGE_ASPECT_COLOR_BIT);
-
-        // Create in flight semaphores and fences
-        _imageAvailableSemaphores.resize(_frameCount);
-        _renderFinishedSemaphores.resize(_frameCount);
-        _inFlightFences.resize(_frameCount);
-
-        VkSemaphoreCreateInfo semaphoreInfo{};
-        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-        VkFenceCreateInfo fenceInfo{};
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-        for (int i = 0; i < _frameCount; ++i)
-        {
-            vkCreateSemaphore(_device->device(), &semaphoreInfo, NULL_ALLOC, _imageAvailableSemaphores.data() + i);
-            vkCreateSemaphore(_device->device(), &semaphoreInfo, NULL_ALLOC, _renderFinishedSemaphores.data() + i);
-            vkCreateFence(_device->device(), &fenceInfo, NULL_ALLOC, _inFlightFences.data() + i);
-        }
+    vkGetSwapchainImagesKHR(device_main::device(), _swapchain, &_frame_count, _swap_images.data());
+    for (auto i = 0u; i < _frame_count; ++i) {
+        _swap_image_views[i] = image_view(_swap_images[i], format, 1, VK_IMAGE_ASPECT_COLOR_BIT);
     }
+    // Create in flight semaphores and fences
+    _image_available_semaphores.resize(_frame_count);
+    _render_finished_semaphores.resize(_frame_count);
+    _in_flight_fences.resize(_frame_count);
 
-    PresentSwapchain::~PresentSwapchain()
-    {
-        if (_device)
-        {
-            for (int i = 0; i < _frameCount; ++i)
-            {
-                vkDestroySemaphore(_device->device(), _imageAvailableSemaphores[i], NULL_ALLOC);
-                vkDestroySemaphore(_device->device(), _renderFinishedSemaphores[i], NULL_ALLOC);
-                vkDestroyFence(_device->device(), _inFlightFences[i], NULL_ALLOC);
-            }
-            vkDestroySwapchainKHR(_device->device(), _swapchain, NULL_ALLOC);
-        }
+    VkSemaphoreCreateInfo semaphore_info{};
+    semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fence_info{};
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (auto i = 0u; i < _frame_count; ++i) {
+        vkCreateSemaphore(device_main::device(), &semaphore_info, NULL_ALLOC, _image_available_semaphores.data() + i);
+        vkCreateSemaphore(device_main::device(), &semaphore_info, NULL_ALLOC, _render_finished_semaphores.data() + i);
+        vkCreateFence(device_main::device(), &fence_info, NULL_ALLOC, _in_flight_fences.data() + i);
     }
+}
 
-    uint32_t PresentSwapchain::acquireFrame()
-    {
-        vkWaitForFences(_device->device(), 1, _inFlightFences.data() + _nextFrame, VK_TRUE, UINT64_MAX);
-
-        // _nextFrame and imageIndex are the same after this call
-        uint32_t imageIndex;
-        vkAcquireNextImageKHR(_device->device(), _swapchain, UINT64_MAX, _imageAvailableSemaphores[_nextFrame], VK_NULL_HANDLE, &imageIndex);
-
-        // NOTE : this check against null only happens the first few calls when fences are not assigned
-        // can't think of a way to remove that check
-        if (_inFlightImageFences[imageIndex] != VK_NULL_HANDLE)
-            vkWaitForFences(_device->device(), 1, _inFlightImageFences.data() + imageIndex, VK_TRUE, UINT64_MAX);
-        _inFlightImageFences[imageIndex] = _inFlightFences[_nextFrame];
-
-        _nextFrame = (_nextFrame + 1) % _frameCount;
-        return imageIndex ;
+swapchain_present::~swapchain_present() {
+    for (auto i = 0u; i < _frame_count; ++i) {
+        vkDestroySemaphore(device_main::device(), _image_available_semaphores[i], NULL_ALLOC);
+        vkDestroySemaphore(device_main::device(), _render_finished_semaphores[i], NULL_ALLOC);
+        vkDestroyFence(device_main::device(), _in_flight_fences[i], NULL_ALLOC);
     }
+    vkDestroySwapchainKHR(device_main::device(), _swapchain, NULL_ALLOC);
+}
 
-    void PresentSwapchain::submitFrame(VkQueue queue, uint32_t frameIndex, const VkCommandBuffer* cmdBuffer)
-    {
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+uint32_t swapchain_present::acquire_frame() {
+    vkWaitForFences(device_main::device(), 1, _in_flight_fences.data() + _next_frame, VK_TRUE, UINT64_MAX);
 
-        VkPipelineStageFlags waitStages[]{ VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    // _nextFrame and imageIndex are the same after this call
+    uint32_t image_index = 0;
+    vkAcquireNextImageKHR(device_main::device(), _swapchain, UINT64_MAX, _image_available_semaphores[_next_frame], VK_NULL_HANDLE, &image_index);
 
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = _imageAvailableSemaphores.data() + frameIndex;
-        submitInfo.pWaitDstStageMask = waitStages;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = cmdBuffer;
-
-        VkSemaphore signalSempahores[]{ _renderFinishedSemaphores[frameIndex] };
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSempahores;
-        vkResetFences(_device->device(), 1, _inFlightFences.data() + frameIndex);
-        vkQueueSubmit(queue, 1, &submitInfo, _inFlightFences[frameIndex]);
-
-        VkPresentInfoKHR presentInfo{};
-        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = signalSempahores;
-
-        VkSwapchainKHR swapChains[]{ _swapchain };
-        presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = swapChains;
-        presentInfo.pImageIndices = &frameIndex;
-        presentInfo.pResults = nullptr; // return value success checks, point to vkresult array
-
-        vkQueuePresentKHR(queue, &presentInfo);
+    // TODO : this check against null only happens the first few calls when fences are not assigned
+    // can't think of a way to remove that check
+    if (_in_flight_image_fences[image_index] != VK_NULL_HANDLE) {
+        vkWaitForFences(device_main::device(), 1, _in_flight_image_fences.data() + image_index, VK_TRUE, UINT64_MAX);
     }
+    _in_flight_image_fences[image_index] = _in_flight_fences[_next_frame];
+
+    _next_frame = (_next_frame + 1) % _frame_count;
+    return image_index;
+}
+
+void swapchain_present::submit_frame(VkQueue queue, uint32_t frame_index, const VkCommandBuffer* cmd_buf) {
+    VkSubmitInfo submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    constexpr VkPipelineStageFlags wait_stages[]{
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+    };
+
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = _image_available_semaphores.data() + frame_index;
+    submit_info.pWaitDstStageMask = wait_stages;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = cmd_buf;
+
+    const VkSemaphore signal_sempahores[]{
+        _render_finished_semaphores[frame_index]
+    };
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = signal_sempahores;
+    vkResetFences(device_main::device(), 1, _in_flight_fences.data() + frame_index);
+    vkQueueSubmit(queue, 1, &submit_info, _in_flight_fences[frame_index]);
+
+    VkPresentInfoKHR present_info{};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores = signal_sempahores;
+
+    const VkSwapchainKHR swapChains[]{
+        _swapchain
+    };
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = swapChains;
+    present_info.pImageIndices = &frame_index;
+    present_info.pResults = nullptr; // return value success checks, point to vkresult array
+
+    vkQueuePresentKHR(queue, &present_info);
+}
+
 }

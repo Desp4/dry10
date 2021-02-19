@@ -3,17 +3,20 @@
 #include "queue.hpp"
 #include "vkw/image/image.hpp"
 
-namespace vkw
-{
-    class GraphicsQueue : public Queue
-    {
-    public:
-        using Queue::Queue;
+namespace dry::vkw {
 
-        void transitionImageLayout(const Image& image, VkImageLayout oldLayout, VkImageLayout newLayout) const;
-        void generateMipMaps(const Image& image) const;
+class queue_graphics : public queue_base {
+public:
+    using queue_base::queue_base;
 
-        // msvc doesn't recognize the constructor in base
-        inline GraphicsQueue& operator=(GraphicsQueue&& oth) { Queue::operator=(std::move(oth)); return *this; }
-    };
+    void transition_image_layout(const image_base& image, VkImageLayout layout_old, VkImageLayout layout_new) const;
+    void generate_mip_maps(const image_base& image) const;
+
+    // NOTE: msvc doesn't recognize the assignment in base
+    queue_graphics& operator=(queue_graphics&& oth) { 
+        queue_base::operator=(std::move(oth));
+        return *this;
+    }
+};
+
 }

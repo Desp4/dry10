@@ -4,27 +4,26 @@
 
 #include "cmdpool.hpp"
 
-namespace vkw
-{
-    class CmdBuffer : public Movable<CmdBuffer>
-    {
-    public:
-        using Movable<CmdBuffer>::operator=;
+namespace dry::vkw {
 
-        static void beginBuffer(VkCommandBuffer buffer, VkCommandBufferUsageFlags usage);
-        
-        CmdBuffer() = default;
-        CmdBuffer(CmdBuffer&&) = default;
-        CmdBuffer(const CmdPool* pool);
-        ~CmdBuffer();
+class cmd_buffer : public movable<cmd_buffer> {
+public:
+    using movable<cmd_buffer>::operator=;
 
-        void begin(VkCommandBufferUsageFlags usage);
+    cmd_buffer() = default;
+    cmd_buffer(cmd_buffer&&) = default;
+    cmd_buffer(const cmd_pool* pool);
+    ~cmd_buffer();
 
-        const VkHandle<VkCommandBuffer>& buffer() const { return _buffer; }
+    void begin(VkCommandBufferUsageFlags usage) const;
 
-    private:
-        NullablePtr<const CmdPool> _pool;
+    const VkCommandBuffer& buffer() const {
+        return _buffer;
+    }
 
-        VkHandle<VkCommandBuffer> _buffer;
-    };
+private:
+    nullable_ptr<const cmd_pool> _pool;
+    vk_handle<VkCommandBuffer> _buffer;
+};
+
 }

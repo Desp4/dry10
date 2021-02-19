@@ -4,41 +4,41 @@
 
 #include "image/imageview.hpp"
 
-namespace vkw
-{
-    // TODO : add recreate option
-    class PresentSwapchain : public Movable<PresentSwapchain>
-    {
-    public:
-        using Movable<PresentSwapchain>::operator=;
+namespace dry::vkw {
 
-        PresentSwapchain() = default;
-        PresentSwapchain(PresentSwapchain&&) = default;
-        PresentSwapchain(const Device* device, VkSurfaceKHR surface, VkExtent2D extent, VkSurfaceTransformFlagBitsKHR transform,
-                         uint32_t minImageCount, VkFormat format, VkColorSpaceKHR colorSpace, VkPresentModeKHR presentMode);
-        ~PresentSwapchain();
+// TODO : add recreate option
+class swapchain_present : public movable<swapchain_present> {
+public:
+    using movable<swapchain_present>::operator=;
 
-        uint32_t acquireFrame();
-        void submitFrame(VkQueue queue, uint32_t frameIndex, const VkCommandBuffer* cmdBuffer);
+    swapchain_present() = default;
+    swapchain_present(swapchain_present&&) = default;
+    swapchain_present(VkSurfaceKHR surface, VkExtent2D extent, VkSurfaceTransformFlagBitsKHR transform,
+        uint32_t min_image_count, VkFormat format, VkColorSpaceKHR color_space, VkPresentModeKHR present_mode);
+    ~swapchain_present();
 
-        const std::vector<ImageView>& swapViews() const { return _swapImageViews; }
+    uint32_t acquire_frame();
+    void submit_frame(VkQueue queue, uint32_t frame_index, const VkCommandBuffer* cmd_buf);
 
-    private:
-        DevicePtr _device;
+    const std::vector<image_view>& swap_views() const {
+        return _swap_image_views;
+    }
 
-        VkHandle<VkSwapchainKHR> _swapchain;
+private:
+    vk_handle<VkSwapchainKHR> _swapchain;
 
-        // concurrent in flight frames and total frames in a swapchain are the same
-        uint32_t _frameCount;
-        uint32_t _nextFrame;
+    // concurrent in flight frames and total frames in a swapchain are the same
+    util::nullable_base<uint32_t, 0> _frame_count;
+    uint32_t _next_frame;
 
-        std::vector<VkImage> _swapImages;
-        std::vector<ImageView> _swapImageViews;
-        // NOTE : semaphores and fences are trivial structures but perhaps you'd want to encapsulate later too
-        std::vector<VkSemaphore> _imageAvailableSemaphores;
-        std::vector<VkSemaphore> _renderFinishedSemaphores;
+    std::vector<VkImage> _swap_images;
+    std::vector<image_view> _swap_image_views;
+    // NOTE : semaphores and fences are trivial structures but perhaps you'd want to encapsulate later too
+    std::vector<VkSemaphore> _image_available_semaphores;
+    std::vector<VkSemaphore> _render_finished_semaphores;
 
-        std::vector<VkFence> _inFlightFences;
-        std::vector<VkFence> _inFlightImageFences;
-    };
+    std::vector<VkFence> _in_flight_fences;
+    std::vector<VkFence> _in_flight_image_fences;
+};
+
 }

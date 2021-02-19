@@ -5,30 +5,34 @@
 
 #include "vkw/vkw.hpp"
 
-namespace vkw
-{
-    class Instance : public Movable<Instance>
-    {
-    public:
-        using DebugCallback = VKAPI_ATTR VkBool32(VKAPI_CALL*)(
-            VkDebugUtilsMessageSeverityFlagBitsEXT,
-            VkDebugUtilsMessageTypeFlagsEXT,
-            const VkDebugUtilsMessengerCallbackDataEXT*,
-            void*);
+namespace dry::vkw {
 
-        using Movable<Instance>::operator=;
-        
-        Instance() = default;
-        Instance(Instance&&) = default;
-        Instance(std::span<const char* const> extensions, std::span<const char* const> layers, DebugCallback callback, const char* exeName = nullptr);
-        ~Instance();
+class instance_main {
+public:
+    using debug_callback = VKAPI_ATTR VkBool32(VKAPI_CALL*)(
+        VkDebugUtilsMessageSeverityFlagBitsEXT,
+        VkDebugUtilsMessageTypeFlagsEXT,
+        const VkDebugUtilsMessengerCallbackDataEXT*,
+        void*
+    );
 
-        std::vector<VkPhysicalDevice> enumeratePhysicalDevices() const;
+    static void create(std::span<const char* const> extensions, std::span<const char* const> layers,
+                       debug_callback callback, const char* name = nullptr);
+    static void destroy();
 
-        const VkHandle<VkInstance>& instance() const { return _instance; }
+    static std::vector<VkPhysicalDevice> enumerate_physical_devices();
 
-    private:
-        VkHandle<VkInstance> _instance;
-        VkHandle<VkDebugUtilsMessengerEXT> _debugger;
-    };
+    static const VkInstance& instance() {
+        return _instance;
+    }
+
+private:
+    instance_main() = default;
+
+    inline static VkInstance _instance = VK_NULL_HANDLE;
+    inline static VkDebugUtilsMessengerEXT _debugger = VK_NULL_HANDLE;
+
+    inline static bool _destroyed = false;
+};
+
 }

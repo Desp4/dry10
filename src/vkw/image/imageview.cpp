@@ -1,26 +1,25 @@
 #include "imageview.hpp"
+#include "vkw/device/device.hpp"
 
-namespace vkw
-{
-    ImageView::ImageView(const Device* device, VkImage image, VkFormat format, uint32_t mipLevels, VkImageAspectFlags aspectFlags) :
-        _device(device)
-    {
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = image;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = format;
-        viewInfo.subresourceRange.aspectMask = aspectFlags;
-        viewInfo.subresourceRange.baseMipLevel = 0;
-        viewInfo.subresourceRange.levelCount = mipLevels;
-        viewInfo.subresourceRange.baseArrayLayer = 0;
-        viewInfo.subresourceRange.layerCount = 1;
+namespace dry::vkw {
 
-        vkCreateImageView(_device->device(), &viewInfo, NULL_ALLOC, &_view);
-    }
+image_view::image_view(VkImage img, VkFormat format, uint32_t mip_lvls, VkImageAspectFlags aspect_flags) {
+    VkImageViewCreateInfo view_info{};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image = img;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = format;
+    view_info.subresourceRange.aspectMask = aspect_flags;
+    view_info.subresourceRange.baseMipLevel = 0;
+    view_info.subresourceRange.levelCount = mip_lvls;
+    view_info.subresourceRange.baseArrayLayer = 0;
+    view_info.subresourceRange.layerCount = 1;
 
-    ImageView::~ImageView()
-    {
-        if (_device) vkDestroyImageView(_device->device(), _view, NULL_ALLOC);
-    }
+    vkCreateImageView(device_main::device(), &view_info, NULL_ALLOC, &_view);
+}
+
+image_view::~image_view() {
+    vkDestroyImageView(device_main::device(), _view, NULL_ALLOC);
+}
+
 }

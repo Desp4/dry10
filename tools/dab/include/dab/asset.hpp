@@ -2,20 +2,19 @@
 
 #include <string>
 
-namespace dab
-{
-    enum AssetType : uint8_t
-    {
-        Asset_None,
-        Asset_Texture,
-        Asset_Shader,
-        Asset_Mesh
+namespace dab {
+
+    enum class asset_type : uint8_t {
+        none,
+        texture,
+        shader,
+        mesh,
+        VALUE_COUNT = mesh + 1
     };
 
-    struct AssetDecl
-    {
+    struct asset_decl {
         std::string name;
         size_t offset;
-        AssetType type;
+        asset_type type;
     };
 }

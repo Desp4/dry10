@@ -1,31 +1,30 @@
 #pragma once
 
-#include "device/device.hpp"
+#include "vkw/vkw.hpp"
 
-namespace vkw
-{
-    class DeviceMemory : public Movable<DeviceMemory>
-    {
-    public:
-        using Movable<DeviceMemory>::operator=;
+namespace dry::vkw {
 
-        // returns UINT32_MAX on failure
-        static uint32_t findMemoryTypeIndex(const Device& device, uint32_t typeFilter, VkMemoryPropertyFlags properties);
+class device_memory : public movable<device_memory> {
+public:
+    using movable<device_memory>::operator=;
 
-        DeviceMemory() = default;
-        DeviceMemory(DeviceMemory&&) = default;
-        DeviceMemory(const Device* device, VkDeviceSize size, uint32_t memoryType);
-        ~DeviceMemory();
+    device_memory() = default;
+    device_memory(device_memory&&) = default;
+    device_memory(VkDeviceSize size, uint32_t memory_type);
+    ~device_memory();
 
-        void writeToMemory(const void* data, VkDeviceSize size);
+    void write(const void* data, VkDeviceSize size);
 
-        const VkHandle<VkDeviceMemory>& memory() const { return _memory; }
-        const VkDeviceSize& size() const { return _size; }
+    const VkDeviceMemory& memory() const {
+        return _memory;
+    }
+    const VkDeviceSize& size() const {
+        return _size;
+    }
 
-    private:
-        DevicePtr _device;
+private:
+    VkDeviceSize _size;
+    vk_handle<VkDeviceMemory> _memory;
+};
 
-        VkDeviceSize _size;
-        VkHandle<VkDeviceMemory> _memory;
-    };
 }

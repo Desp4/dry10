@@ -1,52 +1,69 @@
 #include "device.hpp"
+#include "dbg/log.hpp"
 
-#include <vector>
+namespace dry::vkw {
 
-namespace vkw
+void device_main::create(VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
+    std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features)
 {
-    Device::Device(VkPhysicalDevice physDevice, std::span<const QueueInfo> queueInfos,
-        std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features) :
-        _physDevice(physDevice)
-    {
-        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos(queueInfos.size());
+    PANIC_ASSERT(!_destroyed && _device == VK_NULL_HANDLE, "device should only be created once")
 
-        for (int i = 0; i < queueInfos.size(); ++i)
+    _phys_device = phys_device;
+    std::vector<VkDeviceQueueCreateInfo> queue_create_infos(queue_infos.size());
+
+    for (auto i = 0u; i < queue_infos.size(); ++i) {
+        queue_create_infos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queue_create_infos[i].queueFamilyIndex = queue_infos[i].queue_family_index;
+        queue_create_infos[i].queueCount = queue_infos[i].queue_count;
+        queue_create_infos[i].pQueuePriorities = queue_infos[i].priorities.data();
+        queue_create_infos[i].flags = 0;
+        queue_create_infos[i].pNext = nullptr;
+    }
+
+    VkDeviceCreateInfo device_info{};
+    device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    device_info.pQueueCreateInfos = queue_create_infos.data();
+    device_info.queueCreateInfoCount = queue_create_infos.size();
+    device_info.pEnabledFeatures = &features;
+    device_info.ppEnabledExtensionNames = extensions.data();
+    device_info.enabledExtensionCount = extensions.size();
+    // layers deprecated, skipping
+    vkCreateDevice(_phys_device, &device_info, NULL_ALLOC, &_device);
+}
+
+void device_main::destroy() {
+    PANIC_ASSERT(!_destroyed && _device != VK_NULL_HANDLE, "device should only be destroyed once");
+    vkDestroyDevice(_device, NULL_ALLOC);
+
+    _destroyed = true;
+}
+
+VkSurfaceCapabilitiesKHR device_main::surface_capabilities(VkSurfaceKHR surface) {
+    VkSurfaceCapabilitiesKHR ret{};
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_phys_device, surface, &ret);
+    return ret;
+}
+
+VkPhysicalDeviceMemoryProperties device_main::memory_properties(){
+    VkPhysicalDeviceMemoryProperties mem_properties{};
+    vkGetPhysicalDeviceMemoryProperties(_phys_device, &mem_properties);
+    return mem_properties;
+}
+
+uint32_t device_main::find_memory_type_index(uint32_t type_filter, VkMemoryPropertyFlags properties) {
+    const auto mem_properties = memory_properties();
+    for (auto i = 0u; i < mem_properties.memoryTypeCount; ++i) {
+        if (type_filter & (1 << i) && properties ==
+            (mem_properties.memoryTypes[i].propertyFlags & properties))
         {
-            queueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            queueCreateInfos[i].queueFamilyIndex = queueInfos[i].queueFamilyIndex;
-            queueCreateInfos[i].queueCount = queueInfos[i].queueCount;
-            queueCreateInfos[i].pQueuePriorities = queueInfos[i].priorities.data();
-            queueCreateInfos[i].flags = 0;
-            queueCreateInfos[i].pNext = nullptr;
+            return i;
         }
-
-        VkDeviceCreateInfo deviceInfo{};
-        deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        deviceInfo.pQueueCreateInfos = queueCreateInfos.data();
-        deviceInfo.queueCreateInfoCount = queueCreateInfos.size();
-        deviceInfo.pEnabledFeatures = &features;
-        deviceInfo.ppEnabledExtensionNames = extensions.data();
-        deviceInfo.enabledExtensionCount = extensions.size();
-        // layers deprecated, skipping
-        vkCreateDevice(_physDevice, &deviceInfo, NULL_ALLOC, &_device);
     }
+    return UINT32_MAX;
+}
 
-    Device::~Device()
-    {
-        vkDestroyDevice(_device, NULL_ALLOC);
-    }
+void device_main::wait_on_device() {
+    vkDeviceWaitIdle(_device);
+}
 
-    VkSurfaceCapabilitiesKHR Device::surfaceCapabilities(VkSurfaceKHR surface) const
-    {
-        VkSurfaceCapabilitiesKHR ret;
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_physDevice, surface, &ret);
-        return ret;
-    }
-
-    VkPhysicalDeviceMemoryProperties Device::memoryProperties() const
-    {
-        VkPhysicalDeviceMemoryProperties memProperties;
-        vkGetPhysicalDeviceMemoryProperties(_physDevice, &memProperties);
-        return memProperties;
-    }
 }

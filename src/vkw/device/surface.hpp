@@ -1,28 +1,25 @@
 #pragma once
 
-#ifdef _WIN32
-  #define VK_USE_PLATFORM_WIN32_KHR
-#endif
-
-#include "instance.hpp"
+#include "vkw/vkw.hpp"
 #include "window/window.hpp"
 
-namespace vkw
-{
-    class Surface : public Movable<Surface>
-    {
-    public:
-        using Movable<Surface>::operator=;
+namespace dry::vkw {
 
-        Surface() = default;
-        Surface(Surface&&) = default;
-        Surface(const Instance* instance, wsi::NativeHandle handle);
-        ~Surface();
+class surface : public movable<surface> {
+public:
+    using movable<surface>::operator=;
 
-        const VkHandle<VkSurfaceKHR>& surface() const { return _surface; }
+    surface() = default;
+    surface(surface&&) = default;
+    surface(wsi::native_handle handle);
+    ~surface();
 
-    private:
-        NullablePtr<const Instance> _instance;
-        VkHandle<VkSurfaceKHR> _surface;
-    };
+    const VkSurfaceKHR& vk_surface() const {
+        return _surface;
+    }
+
+private:
+    vk_handle<VkSurfaceKHR> _surface;
+};
+
 }

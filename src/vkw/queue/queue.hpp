@@ -2,26 +2,30 @@
 
 #include "vkw/cmd/cmdbuffer.hpp"
 
-namespace vkw
-{
-    // TODO : if doing multiple pools, ring buffers etc need to reflect that or just dump all queue functionality in free functions
-    class Queue : public Movable<Queue>
-    {
-    public:
-        using Movable<Queue>::operator=;
+namespace dry::vkw {
 
-        Queue() = default;
-        Queue(Queue&&) = default;
-        Queue(const Device* device, uint32_t queueFamilyIndex, uint32_t queueIndex);
+// TODO : if doing multiple pools, ring buffers etc need to reflect that or just dump all queue functionality in free functions
+class queue_base : public movable<queue_base> {
+public:
+    using movable<queue_base>::operator=;
 
-        void submitCmd(VkCommandBuffer cmdBuffer) const;
+    queue_base() = default;
+    queue_base(queue_base&&) = default;
+    queue_base(uint32_t queue_family_index, uint32_t queue_index);
 
-        // NOTE : need in these in renderer for allocating buffers and for swapchain only
-        VkQueue queue() const { return _queue; }
-        const CmdPool& pool() const { return _pool; }
+    void submit_cmd(VkCommandBuffer cmd_buf) const;
 
-    protected:
-        VkQueue _queue;
-        CmdPool _pool;
-    };
+    // NOTE : need these in renderer for allocating buffers and for swapchain only
+    VkQueue queue() const {
+        return _queue;
+    }
+    const cmd_pool& pool() const {
+        return _pool;
+    }
+
+protected:
+    VkQueue _queue;
+    cmd_pool _pool;
+};
+
 }

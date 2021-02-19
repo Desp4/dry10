@@ -5,14 +5,13 @@
 
 #include "dab/asset.hpp"
 
-struct AssetBlock
-{
-    std::ofstream file;
-    std::vector<dab::AssetDecl> header;
-};
-
 namespace fs = std::filesystem;
 
-int writeTexture(AssetBlock& block, const fs::path& path);
-int writeShader(AssetBlock& block, const fs::path& path);
-int writeMesh(AssetBlock& block, const fs::path& path);
+struct asset_block {
+    std::ofstream file;
+    std::vector<dab::asset_decl> header;
+};
+
+bool write_texture(asset_block& block, const fs::path& path);
+bool write_shader(asset_block& block, const fs::path& path);
+bool write_mesh(asset_block& block, const fs::path& path);

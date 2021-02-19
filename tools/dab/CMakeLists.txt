@@ -10,15 +10,12 @@ set(DAB_ASSIMP  "" CACHE PATH "Assimp source directory")
 add_subdirectory(${DAB_ASSIMP} "${CMAKE_CURRENT_BINARY_DIR}/assimp_build")
 
 file(GLOB_RECURSE DAB_DAB_SOURCES
-    "${PROJECT_SOURCE_DIR}/src/dab/*.hpp"
     "${PROJECT_SOURCE_DIR}/src/dab/*.cpp")
 
 file(GLOB_RECURSE DAB_LIB_SOURCES
-    "${PROJECT_SOURCE_DIR}/src/lib/*.hpp"
     "${PROJECT_SOURCE_DIR}/src/lib/*.cpp")
 
 file(GLOB_RECURSE DAB_SHPB_SOURCES
-    "${PROJECT_SOURCE_DIR}/src/shpb/*.hpp"
     "${PROJECT_SOURCE_DIR}/src/shpb/*.cpp")
 
 add_executable(dab ${DAB_DAB_SOURCES})

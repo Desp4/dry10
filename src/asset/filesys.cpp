@@ -1,93 +1,64 @@
 #include "filesys.hpp"
 
-namespace asset
-{
-    Filesystem::Filesystem() :
-        _currBlock(_blocks.end())
-    {
-    }
+namespace dry::asset {
 
-    Filesystem::Filesystem(const char* assetDir) :
-        Filesystem({ &assetDir, 1 })
-    {
-    }
+void filesystem::add_file(const std::filesystem::path& dab_file) {
+    const auto curr_block_ind = _curr_block == _blocks.end() ? -1 : _curr_block - _blocks.begin();
 
-    Filesystem::Filesystem(std::span<const char* const> assetDirs) :
-        Filesystem()
-    {
-        addDirectories(assetDirs);
-    }
-
-    void Filesystem::addDirectory(const char* assetDir)
-    {
-        addDirectories({ &assetDir, 1 });
-    }
-
-    void Filesystem::addDirectories(std::span<const char* const> assetDirs)
-    {
-        const int32_t currBlockAbs = _currBlock == _blocks.end() ? -1 : _currBlock - _blocks.begin();
-
-        for (const char* dir : assetDirs)
-        {
-            for (const auto& file : std::filesystem::recursive_directory_iterator(dir))
-            {
-                if (file.is_directory())
-                    continue;
-
-                if (_importer.open(file.path()))
-                {
-                    _blocks.emplace_back(file.path(), _importer.assetDeclarations());
-
-                    _importer.close();
-                    // NOTE : path defaults to wchar_t on win, have to convert to string sadly
-                    LOG_DBG("asset added %s", file.path().string().c_str());
-                }
-                else
-                {
-                    LOG_WRN("invalid asset type %s, skipping", file.path().string().c_str());
-                }
-            }
-        }
-
-        // to preserve correct iterator
-        _currBlock = currBlockAbs == -1 ? _blocks.end() : _blocks.begin() + currBlockAbs;
-    }
-
-    void Filesystem::loadBlock(const std::filesystem::path& blockName)
-    {
-        const auto blockIt = std::find_if(_blocks.begin(), _blocks.end(),
-            [&blockName](const AssetBlock& oth) { return oth.path == blockName; });
-
-        PANIC_ASSERT(blockIt != _blocks.end(), "block name %s is not present", blockName.string().c_str());
-        if (blockIt == _currBlock)
-        {
-            LOG_WRN("block %s already loaded", blockIt->path.filename().string().c_str());
-            return;
-        }
-
-        PANIC_ASSERT(_importer.open(blockName), "could not open asset block %s", blockIt->path.string().c_str());
-
-        _currBlock = blockIt;
-        LOG_DBG("loaded asset block %s", blockIt->path.filename().string().c_str());
-    }
-
-    void Filesystem::unloadBlock()
-    {
-        if (_currBlock == _blocks.end())
-        {
-            LOG_WRN("no block to unload");
-            return;
+    if (_importer.open(dab_file)) {
+        asset_block& new_block = _blocks.emplace_back(asset_block());
+        new_block.path = dab_file;
+        const auto declarations = _importer.declarations();
+        for (const auto& declaration : declarations) {
+            new_block.assets[static_cast<size_t>(declaration.type)].emplace_back(declaration.name, declaration.offset);
         }
 
         _importer.close();
-        LOG_DBG("unloaded asset block %s", _currBlock->path.filename().string().c_str());
-        _currBlock = _blocks.end();
+        // NOTE : path defaults to wchar_t on win, have to convert to string sadly
+        LOG_DBG("asset added %s", dab_file.string().c_str());
+    }
+    else {
+        LOG_WRN("invalid asset type %s", dab_file.string().c_str());
     }
 
-    std::string Filesystem::assetHash(const std::string& name, dab::AssetType type)
-    {
-        // '/' is append
-        const std::filesystem::path path = "static" / _currBlock->path.filename() / std::to_string(type) / name;
-        return path.string();
+    // to preserve correct iterator on realloc
+    _curr_block = curr_block_ind == -1 ? _blocks.end() : _blocks.begin() + curr_block_ind;
+}
+
+void filesystem::load_block(const std::filesystem::path& block_name) {
+    const auto block_it = std::find_if(_blocks.begin(), _blocks.end(),
+        [&block_name](const asset_block& oth) {
+            return oth.path == block_name;
+        }
+    );
+
+    PANIC_ASSERT(block_it != _blocks.end(), "block name %s is not present", block_name.string().c_str());
+    if (block_it == _curr_block) {
+        LOG_WRN("block %s already loaded", block_it->path.filename().string().c_str());
+        return;
     }
+
+    PANIC_ASSERT(_importer.open(block_name), "could not open asset block %s", block_it->path.string().c_str());
+
+    _curr_block = block_it;
+    LOG_DBG("loaded asset block %s", block_it->path.filename().string().c_str());
+}
+
+void filesystem::unload_current_block() {
+    if (_curr_block == _blocks.end()) {
+        LOG_WRN("no block to unload");
+        return;
+    }
+
+    _importer.close();
+    LOG_DBG("unloaded asset block %s", _curr_block->path.filename().string().c_str());
+    _curr_block = _blocks.end();
+}
+
+void filesystem::clear() {
+    _importer.close();
+    _blocks.clear();
+    _curr_block = _blocks.end();
+}
+
 }

@@ -1,30 +1,29 @@
-#include "readers.hpp"
-
 #include <filesystem>
 
+#include "readers.hpp"
 #include "share/shpb_type.hpp"
 
-int writeShader(AssetBlock& block, const fs::path& path)
-{
+bool write_shader(asset_block& block, const fs::path& path) {
     // no checks yet
-    std::ifstream shpbFile(path, std::ios_base::binary);
-    char magicBuffer[sizeof shpb::FILE_MAGIC]{ 0 };
+    std::ifstream shpb_file(path, std::ios_base::binary);
+    char magic_buffer[sizeof shpb::FILE_MAGIC]{ 0 };
 
-    shpbFile.read(magicBuffer, sizeof magicBuffer);
-    if (memcmp(magicBuffer, shpb::FILE_MAGIC, sizeof shpb::FILE_MAGIC))
-        return -1;
+    shpb_file.read(magic_buffer, sizeof magic_buffer);
+    if (memcmp(magic_buffer, shpb::FILE_MAGIC, sizeof shpb::FILE_MAGIC)) {
+        return false;
+    }
 
-    block.header.push_back(dab::AssetDecl{
+    block.header.push_back(dab::asset_decl{
         .name = path.stem().string(),
         .offset = static_cast<size_t>(block.file.tellp()),
-        .type = dab::Asset_Shader });
+        .type = dab::asset_type::shader
+    });
 
-    shpbFile.seekg(0, std::ios_base::end);
-    const size_t size = shpbFile.tellg();
-    shpbFile.seekg(0, std::ios_base::beg);
+    shpb_file.seekg(0, std::ios_base::end);
+    const size_t size = shpb_file.tellg();
+    shpb_file.seekg(0, std::ios_base::beg);
 
     block.file.write(reinterpret_cast<const char*>(&size), sizeof size);
-    block.file << shpbFile.rdbuf();
-
-    return 0;
+    block.file << shpb_file.rdbuf();
+    return true;
 }

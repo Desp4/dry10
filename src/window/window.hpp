@@ -1,53 +1,37 @@
 #pragma once
 
-#ifdef _WIN32
-  #include <windows.h>
-#endif
-
-#ifdef _WIN32
-  #define GLFW_EXPOSE_NATIVE_WIN32
-#endif
-
 #include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
 
 #include "util/util.hpp"
 
-namespace wsi
-{
-    struct GLFWDummy
-    {
-        GLFWDummy()
-        {
-            glfwInit();
-        }
+namespace dry::wsi {
 
-        ~GLFWDummy()
-        {
-            glfwTerminate();
-        }
-    };
+struct gldw_dummy {
+    gldw_dummy() {
+        glfwInit();
+    }
+    ~gldw_dummy() {
+        glfwTerminate();
+    }
+};
 
-#ifdef _WIN32
-    using NativeHandle = HWND;
-#endif
+// opaque to not include win32 here
+using native_handle = void*;
 
-    class Window : public util::Movable<Window>
-    {
-    public:
-        using util::Movable<Window>::operator=;
+class window : public util::movable<window> {
+public:
+    using util::movable<window>::operator=;
 
-        Window() = default;
-        Window(Window&&) = default;
-        Window(uint32_t width, uint32_t height);
-        ~Window();
+    window() = default;
+    window(uint32_t width, uint32_t height);
+    ~window();
 
-        bool shouldClose() const;
-        void pollEvents() const;
-        NativeHandle windowHandle() const;
-        GLFWwindow* window() const { return _window; }
+    bool should_close() const;
+    void poll_events() const;
+    native_handle window_handle() const;
 
-    private:
-        util::NullablePtr<GLFWwindow> _window;
-    };
+private:
+    util::nullable_ptr<GLFWwindow> _window;
+};
+
 }

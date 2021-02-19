@@ -4,48 +4,54 @@
 
 #include "image/imageviewpair.hpp"
 #include "framebuffer.hpp"
+#include "cmd/cmdbuffer.hpp"
 
-namespace vkw
-{
-    enum RenderPassFlagBits : uint32_t
-    {
-        RenderPass_Color = 0x1,
-        RenderPass_Depth = 0x2,
-        RenderPass_MSAA = 0x4
-    };
-    using RenderPassFlags = uint32_t;
+namespace dry::vkw {
 
-    class RenderPass : public Movable<RenderPass>
-    {
-    public:
-        using Movable<RenderPass>::operator=;
+enum class render_pass_flags : uint32_t {
+    color = 0x1,
+    depth = 0x2,
+    msaa  = 0x4
+};
 
-        RenderPass() = default;
-        RenderPass(RenderPass&&) = default;
-        RenderPass(const Device* device, VkExtent2D extent, RenderPassFlags flags,
-                   VkFormat imageFormat, VkFormat depthFormat, VkSampleCountFlagBits samples);
-        ~RenderPass();
+consteval bool enable_flags(render_pass_flags) {
+    return true;
+}
 
-        void createFrameBuffers(std::span<const ImageView> swapViews);
+class render_pass : public movable<render_pass> {
+public:
+    using movable<render_pass>::operator=;
 
-        void startCmdPass(VkCommandBuffer buffer, uint32_t frameInd) const;
+    render_pass() = default;
+    render_pass(render_pass&&) = default;
+    render_pass(VkExtent2D extent, render_pass_flags flags, VkSampleCountFlagBits samples,
+                VkFormat image_format, VkFormat depth_format);
+    ~render_pass();
 
-        const VkHandle<VkRenderPass>& renderPass() const { return _pass; }
-        const VkSampleCountFlagBits& rasterSampleCount() const { return _samples; }
-        const VkBool32& depthEnabled() const { return _depthEnabled; }
+    void create_framebuffers(std::span<const image_view> swap_views);
+    void start_cmd_pass(const cmd_buffer& buf, uint32_t frame_ind) const;
 
-    private:
-        DevicePtr _device;
+    const VkRenderPass& pass() const {
+        return _pass;
+    }
+    VkSampleCountFlagBits raster_sample_count() const {
+        return _samples;
+    }
+    VkBool32 depth_enabled() const {
+        return _depth_enabled;
+    }
 
-        VkHandle<VkRenderPass> _pass;
+private:
+    vk_handle<VkRenderPass> _pass;
 
-        VkExtent2D _extent;
-        VkBool32 _depthEnabled;
-        VkSampleCountFlagBits _samples;
+    VkExtent2D _extent;
+    VkBool32 _depth_enabled;
+    VkSampleCountFlagBits _samples;
 
-        ImageViewPair _depthImage;
-        ImageViewPair _colorImage;
+    image_view_pair _depth_image;
+    image_view_pair _color_image;
 
-        std::vector<FrameBuffer> _frameBuffers;
-    };
+    std::vector<framebuffer> _framebuffers;
+};
+
 }

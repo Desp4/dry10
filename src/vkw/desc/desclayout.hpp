@@ -1,24 +1,26 @@
 #pragma once
 
-#include "vkw/device/device.hpp"
+#include <span>
 
-namespace vkw
-{
-    class DescriptorLayout : public Movable<DescriptorLayout>
-    {
-    public:
-        using Movable<DescriptorLayout>::operator=;
+#include "vkw/vkw.hpp"
 
-        DescriptorLayout() = default;
-        DescriptorLayout(DescriptorLayout&&) = default;
-        DescriptorLayout(const Device* device, std::span<const VkDescriptorSetLayoutBinding> bindings);
-        ~DescriptorLayout();
+namespace dry::vkw {
 
-        const VkHandle<VkDescriptorSetLayout>& layout() const { return _descriptorSetLayout; }
+class descriptor_layout : public movable<descriptor_layout> {
+public:
+    using movable<descriptor_layout>::operator=;
 
-    private:
-        DevicePtr _device;
+    descriptor_layout() = default;
+    descriptor_layout(descriptor_layout&&) = default;
+    descriptor_layout(std::span<const VkDescriptorSetLayoutBinding> bindings);
+    ~descriptor_layout();
 
-        VkHandle<VkDescriptorSetLayout> _descriptorSetLayout;
-    };
+    const VkDescriptorSetLayout& layout() const {
+        return _descriptor_set_layout;
+    }
+
+private:
+    vk_handle<VkDescriptorSetLayout> _descriptor_set_layout;
+};
+
 }

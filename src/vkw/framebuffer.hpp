@@ -1,24 +1,26 @@
 #pragma once
 
-#include "device/device.hpp"
+#include <span>
 
-namespace vkw
-{
-    class FrameBuffer : public Movable<FrameBuffer>
-    {
-    public:
-        using Movable<FrameBuffer>::operator=;
+#include "vkw.hpp"
 
-        FrameBuffer() = default;
-        FrameBuffer(FrameBuffer&&) = default;
-        FrameBuffer(const Device* device, VkRenderPass renderPass, std::span<const VkImageView> views, VkExtent2D extent);
-        ~FrameBuffer();
-        
-        const VkHandle<VkFramebuffer>& frameBuffer() const { return _frameBuffer; }
+namespace dry::vkw {
 
-    private:
-        DevicePtr _device;
+class framebuffer : public movable<framebuffer> {
+public:
+    using movable<framebuffer>::operator=;
 
-        VkHandle<VkFramebuffer> _frameBuffer;
-    };
+    framebuffer() = default;
+    framebuffer(framebuffer&&) = default;
+    framebuffer(VkRenderPass renderpass, std::span<const VkImageView> views, VkExtent2D extent);
+    ~framebuffer();
+
+    const VkFramebuffer& buffer() const {
+        return _framebuffer;
+    }
+
+private:
+    vk_handle<VkFramebuffer> _framebuffer;
+};
+
 }

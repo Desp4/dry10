@@ -1,30 +1,30 @@
 #include "dryprogram.hpp"
+#include "vkw/device/device.hpp"
 
-namespace gr
+namespace dry::gr {
+
+dry_program::dry_program() :
+    dry_program(DEFAULT_WIN_WIDTH, DEFAULT_WIN_HEIGHT)
 {
-    DryProgram::DryProgram() :
-        DryProgram(DEFAULT_WIN_WIDTH, DEFAULT_WIN_HEIGHT)
-    {
-    }
+}
 
-    DryProgram::DryProgram(uint32_t width, uint32_t height) :
-        _window(width, height),
-        _grInstance(_window.windowHandle()),
-        _resManager(_grInstance)
-    {
-    }
+dry_program::dry_program(uint32_t width, uint32_t height) :
+    _window(width, height),
+    _gr_instance(_window.window_handle()),
+    _res_man(_gr_instance)
+{
+}
 
-    void DryProgram::beginRender()
-    {
-        onStart();
-        while (!_window.shouldClose())
-        {
-            _window.pollEvents();
+void dry_program::begin_render() {
+    on_start();
+    while (!_window.should_close()) {
+        _window.poll_events();
 
-            _resManager.advanceFrame();
-            update();
-            _resManager.submitFrame();
-        }
-        _resManager.waitOnDevice();
+        _res_man.advance_frame();
+        update();
+        _res_man.submit_frame();
     }
+    vkw::device_main::wait_on_device();
+}
+
 }

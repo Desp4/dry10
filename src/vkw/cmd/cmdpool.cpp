@@ -1,20 +1,19 @@
 #include "cmdpool.hpp"
+#include "vkw/device/device.hpp"
 
-namespace vkw
-{
-    CmdPool::CmdPool(const Device* device, uint32_t queue) :
-        _device(device)
-    {
-        VkCommandPoolCreateInfo poolInfo{};
-        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.queueFamilyIndex = queue;
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // NOTE : this for rewriting used buffers
+namespace dry::vkw {
 
-        vkCreateCommandPool(_device->device(), &poolInfo, NULL_ALLOC, &_pool);
-    }
+cmd_pool::cmd_pool(uint32_t queue) {
+    VkCommandPoolCreateInfo pool_info{};
+    pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_info.queueFamilyIndex = queue;
+    pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // NOTE : this for rewriting used buffers
 
-    CmdPool::~CmdPool()
-    {
-        if (_device) vkDestroyCommandPool(_device->device(), _pool, NULL_ALLOC);
-    }
+    vkCreateCommandPool(device_main::device(), &pool_info, NULL_ALLOC, &_pool);
+}
+
+cmd_pool::~cmd_pool() {
+    vkDestroyCommandPool(device_main::device(), _pool, NULL_ALLOC);
+}
+
 }

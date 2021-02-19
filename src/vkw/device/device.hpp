@@ -5,35 +5,37 @@
 
 #include "vkw/vkw.hpp"
 
-namespace vkw
-{
-    class Device : public Movable<Device>
-    {
-    public:
-        struct QueueInfo
-        {
-            uint32_t queueFamilyIndex;
-            uint32_t queueCount;
-            std::vector<float> priorities;
-        };
+namespace dry::vkw {
 
-        using Movable<Device>::operator=;
-
-        Device() = default;
-        Device(Device&&) = default;
-        Device(VkPhysicalDevice physDevice, std::span<const QueueInfo> queueInfos,
-               std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features);
-        ~Device();
-
-        VkSurfaceCapabilitiesKHR surfaceCapabilities(VkSurfaceKHR surface) const;
-        VkPhysicalDeviceMemoryProperties memoryProperties() const;
-
-        const VkHandle<VkDevice>& device() const { return _device; }
-
-    private:
-        VkHandle<VkDevice> _device;
-        VkHandle<VkPhysicalDevice> _physDevice;
+class device_main {
+public:
+    struct queue_info {
+        uint32_t queue_family_index;
+        uint32_t queue_count;
+        std::vector<float> priorities;
     };
 
-    using DevicePtr = NullablePtr<const Device>;
+    static void create(VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
+                       std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features);
+    static void destroy();
+
+    static VkSurfaceCapabilitiesKHR surface_capabilities(VkSurfaceKHR surface);
+    static VkPhysicalDeviceMemoryProperties memory_properties();
+    // returns UINT32_MAX on failure
+    static uint32_t find_memory_type_index(uint32_t type_filter, VkMemoryPropertyFlags properties);
+    static void wait_on_device();
+
+    static const VkDevice& device(){
+        return _device;
+    }
+
+private:
+    device_main() = default;
+
+    inline static VkDevice _device = VK_NULL_HANDLE;
+    inline static VkPhysicalDevice _phys_device = VK_NULL_HANDLE;
+
+    inline static bool _destroyed = false;
+};
+
 }

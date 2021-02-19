@@ -1,24 +1,24 @@
 #pragma once
 
-#include "image.hpp"
+#include "vkw/vkw.hpp"
 
-namespace vkw
-{
-    class ImageView : public Movable<ImageView>
-    {
-    public:
-        using Movable<ImageView>::operator=;
+namespace dry::vkw {
 
-        ImageView() = default;
-        ImageView(ImageView&& oth) = default;
-        ImageView(const Device* device, VkImage image, VkFormat format, uint32_t mipLevels, VkImageAspectFlags aspectFlags);
-        ~ImageView();
+class image_view : public movable<image_view> {
+public:
+    using movable<image_view>::operator=;
 
-        const VkHandle<VkImageView>& imageView() const { return _view; }
+    image_view() = default;
+    image_view(image_view&&) = default;
+    image_view(VkImage img, VkFormat format, uint32_t mip_lvls, VkImageAspectFlags aspect_flags);
+    ~image_view();
 
-    private:
-        DevicePtr _device;
+    const VkImageView& view() const {
+        return _view;
+    }
 
-        VkHandle<VkImageView> _view;
-    };
+private:
+    vk_handle<VkImageView> _view;
+};
+
 }
