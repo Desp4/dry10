@@ -47,6 +47,7 @@ void log(log_level lvl, const char* file, uint32_t line, const char* format, Arg
     // can't have shit with iostream
     fprintf(stderr, "%s%s:%u]\033[0m", lvl_str, true_file, line);
     fprintf(stderr, format, args...);
+    fprintf(stderr, "\n");
 }
 
 }

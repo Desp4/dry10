@@ -8,7 +8,7 @@ public:
         dry::gr::dry_program()
     {
         const std::string name = "viking_room";
-        _asset_reg.add_resource_block("../../../tests/sandbox/assets");
+        _asset_reg.add_resource_block("../../../tests/sandbox/assets/blob.dab");
         _asset_reg.load<dry::asset::mesh_asset>(name);
         _asset_reg.load<dry::asset::shader_asset>("def");
         _asset_reg.load<dry::asset::texture_asset>(name);

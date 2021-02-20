@@ -28,11 +28,11 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
     persistent_recording_data new_recording_data;
 
     pipeline_group* curr_pipeline = nullptr;
-    LOG_DBG("creating renderable[%#010x; %#010x]", &mat, &mesh);
+    LOG_DBG("creating renderable[0x%08x; 0x%08x]", &mat, &mesh);
 
     // check descriptors
     if (!_pipeline_groups.contains(mat.shader->hash())) {
-        LOG_DBG("shader[hash %#010x] not registered, creating a pipeline", mat.shader->hash());
+        LOG_DBG("shader[hash 0x%08x] not registered, creating a pipeline", mat.shader->hash());
 
         struct pipeline_group new_pipeline;
         new_pipeline.layout = vkw::descriptor_layout(vk_data.layout_bindings);
@@ -42,7 +42,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
         curr_pipeline = &_pipeline_groups.emplace(mat.shader->hash(), std::move(new_pipeline)).first->second;
     }
     else {
-        LOG_DBG("shader[asset %#010x] present, binding object", mat.shader->hash());
+        LOG_DBG("shader[asset 0x%08x] present, binding object", mat.shader->hash());
         curr_pipeline = &_pipeline_groups[mat.shader->hash()];
         curr_pipeline->true_size += 1;
     }
@@ -50,7 +50,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
 
     // check meshes
     if (!_mesh_buffers.contains(mesh.hash())) {
-        LOG_DBG("mesh[hash %#010x] not registered, allocating buffers", mesh.hash());
+        LOG_DBG("mesh[hash 0x%08x] not registered, allocating buffers", mesh.hash());
 
         mesh_data new_mesh;
         new_mesh.index_buffer = _transfer_queue.create_local_buffer(
@@ -67,7 +67,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
         _mesh_buffers.emplace(mesh.hash(), refcounted_t<mesh_data>{std::move(new_mesh), 1});
     }
     else {
-        LOG_DBG("mesh[hash %#010x] registered, binding object", mesh.hash());
+        LOG_DBG("mesh[hash 0x%08x] registered, binding object", mesh.hash());
         _mesh_buffers[mesh.hash()].count += 1;
     }
     new_recording_data.mesh_id = mesh.hash();
@@ -82,7 +82,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
     new_renderable.sampler_ids.reserve(mat.textures.size());
     for (const auto& texture : mat.textures) {
         if (!_combined_samplers.contains(texture->hash())) {
-            LOG_DBG("texture[hash %#010x] not registered, allocating combined sampler", texture->hash());
+            LOG_DBG("texture[hash 0x%08x] not registered, allocating combined sampler", texture->hash());
 
             combined_sampler_data new_comb_sampler;
             const uint32_t mip_levels = std::log2((std::max)(texture->width, texture->height));
@@ -116,7 +116,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
             _combined_samplers.emplace(texture->hash(), refcounted_t<combined_sampler_data>{std::move(new_comb_sampler), 1});
         }
         else {
-            LOG_DBG("texture[hash %#010x] registered, binding object", texture->hash());
+            LOG_DBG("texture[hash 0x%08x] registered, binding object", texture->hash());
             _combined_samplers[texture->hash()].count += 1;
         }
         new_renderable.sampler_ids.push_back(texture->hash());
@@ -180,7 +180,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
 
     new_renderable.desc_id.data_id = curr_pipeline->recording_data.emplace(std::move(new_recording_data));
 
-    LOG_DBG("renderable[%#010x; %#010x] created", new_renderable.desc_id.pipeline_id, new_renderable.desc_id.data_id);
+    LOG_DBG("renderable[0x%08x; 0x%08x] created", new_renderable.desc_id.pipeline_id, new_renderable.desc_id.data_id);
     return new_renderable;
 }
 
@@ -196,7 +196,7 @@ void resource_manager::destroy_renderable(renderable& rend) {
 
     rend_group.recording_data.remove(rend.desc_id.data_id);
     _expired_recording_datas.emplace_back(std::move(expired_rend));
-    LOG_DBG("renderable[%#010x; %#010x] deleted", rend.desc_id.pipeline_id, rend.desc_id.data_id);
+    LOG_DBG("renderable[0x%08x; 0x%08x] deleted", rend.desc_id.pipeline_id, rend.desc_id.data_id);
 }
 
 void resource_manager::write_to_buffer(const renderable& rend, uint32_t ubo, const void* data, uint32_t size) {
@@ -228,7 +228,7 @@ void resource_manager::advance_frame() {
             rend_mesh_it->second.count -= 1;
 
             if (rend_mesh_it->second.count == 0) {
-                LOG_DBG("mesh[hash %#010x] unused, freeing", p->recording_data.mesh_id);
+                LOG_DBG("mesh[hash 0x%08x] unused, freeing", p->recording_data.mesh_id);
                 _mesh_buffers.erase(rend_mesh_it);
             }
 
@@ -238,7 +238,7 @@ void resource_manager::advance_frame() {
                 rend_sampler_it->second.count -= 1;
 
                 if (rend_sampler_it->second.count == 0) {
-                    LOG_DBG("texture[hash %#010x] unused, freeing", sampler_id);
+                    LOG_DBG("texture[hash 0x%08x] unused, freeing", sampler_id);
                     _combined_samplers.erase(rend_sampler_it);
                 }
             }
@@ -248,11 +248,11 @@ void resource_manager::advance_frame() {
             rend_group_it->second.true_size -= 1;
 
             if (rend_group_it->second.true_size == 0) {
-                LOG_DBG("pipeline[hash %#010x] unused, destroying", p->pipeline_id);
+                LOG_DBG("pipeline[hash 0x%08x] unused, destroying", p->pipeline_id);
                 _pipeline_groups.erase(rend_group_it);
             }
 
-            LOG_DBG("expired renderable[pipeline %#010x] freed", p->pipeline_id);
+            LOG_DBG("expired renderable[pipeline 0x%08x] freed", p->pipeline_id);
             // NOTE : expired elements are all in a queue in a strictly decreasing expired_count order
             // that means that if removal happens it happens in the front
             _expired_recording_datas.pop_front();

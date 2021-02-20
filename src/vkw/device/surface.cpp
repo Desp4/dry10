@@ -19,7 +19,11 @@ surface::surface(wsi::native_handle handle) {
 }
 
 surface::~surface() {
-    vkDestroySurfaceKHR(instance_main::instance(), _surface, NULL_ALLOC);
+    // TODO : get rid of global instance, it serves little purpose and forces to perform this check
+    // when graphics lifetime need to free a surface after deleting instance
+    if (_surface) {
+        vkDestroySurfaceKHR(instance_main::instance(), _surface, NULL_ALLOC);
+    }   
 }
 
 }

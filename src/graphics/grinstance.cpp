@@ -110,7 +110,8 @@ graphics_instance::graphics_instance(wsi::native_handle window) {
 graphics_instance::~graphics_instance() {
     vkw::device_main::destroy();
     _surface = vkw::surface{}; // HACK to get around singleton ugliness
-    vkw::instance_main::destroy();
+    vkw::instance_main::destroy(); // TODO : global device I can bear, global instance I can not
+    // see surface destructor and despair
 }
 
 }

@@ -16,16 +16,16 @@ public:
 
     void begin_render();
 
+private:
+    wsi::window _window;
+    graphics_instance _gr_instance;
+
 protected:
     virtual void on_start() = 0;
     virtual void update() = 0;
 
     resource_manager _res_man;
     asset::asset_registry _asset_reg;
-
-private:
-    wsi::window _window;
-    graphics_instance _gr_instance;
 };
 
 }

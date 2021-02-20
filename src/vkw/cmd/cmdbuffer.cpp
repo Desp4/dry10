@@ -15,7 +15,9 @@ cmd_buffer::cmd_buffer(const cmd_pool* pool) :
 }
 
 cmd_buffer::~cmd_buffer() {
-    vkFreeCommandBuffers(device_main::device(), _pool->pool(), 1, &_buffer);
+    if (_pool != nullptr) {
+        vkFreeCommandBuffers(device_main::device(), _pool->pool(), 1, &_buffer);
+    }   
 }
 
 void cmd_buffer::begin(VkCommandBufferUsageFlags usage) const {
