@@ -7,7 +7,7 @@
 
 namespace dry::vkw {
 
-class instance_main {
+class instance : public movable<instance> {
 public:
     using debug_callback = VKAPI_ATTR VkBool32(VKAPI_CALL*)(
         VkDebugUtilsMessageSeverityFlagBitsEXT,
@@ -16,23 +16,23 @@ public:
         void*
     );
 
-    static void create(std::span<const char* const> extensions, std::span<const char* const> layers,
-                       debug_callback callback, const char* name = nullptr);
-    static void destroy();
+    using movable<instance>::operator=;
 
-    static std::vector<VkPhysicalDevice> enumerate_physical_devices();
+    instance() = default;
+    instance(instance&&) = default;
+    instance(std::span<const char* const> extensions, std::span<const char* const> layers,
+             debug_callback callback, const char* name = nullptr);
+    ~instance();
 
-    static const VkInstance& instance() {
+    std::vector<VkPhysicalDevice> enumerate_physical_devices() const;
+
+    const VkInstance& vk_instance() const {
         return _instance;
     }
 
 private:
-    instance_main() = default;
-
-    inline static VkInstance _instance = VK_NULL_HANDLE;
-    inline static VkDebugUtilsMessengerEXT _debugger = VK_NULL_HANDLE;
-
-    inline static bool _destroyed = false;
+    vk_handle<VkInstance> _instance;
+    VkDebugUtilsMessengerEXT _debugger = VK_NULL_HANDLE;
 };
 
 }

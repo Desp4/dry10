@@ -3,9 +3,7 @@
 
 namespace dry::vkw {
 
-void instance_main::create(std::span<const char* const> extensions, std::span<const char* const> layers, debug_callback callback, const char* name) {
-    PANIC_ASSERT(!_destroyed && _instance == VK_NULL_HANDLE, "instance should only be created once");
-
+instance::instance(std::span<const char* const> extensions, std::span<const char* const> layers, debug_callback callback, const char* name) {
     VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.apiVersion = VK_API_VERSION_1_2;
@@ -52,18 +50,14 @@ void instance_main::create(std::span<const char* const> extensions, std::span<co
     }
 }
 
-void instance_main::destroy() {
-    PANIC_ASSERT(!_destroyed && _instance != VK_NULL_HANDLE, "instance should only be destroyed once");
-
+instance::~instance() {
     const auto destroy_debugger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
         vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT"));
     destroy_debugger(_instance, _debugger, NULL_ALLOC);
     vkDestroyInstance(_instance, NULL_ALLOC);
-
-    _destroyed = true;
 }
 
-std::vector<VkPhysicalDevice> instance_main::enumerate_physical_devices() {
+std::vector<VkPhysicalDevice> instance::enumerate_physical_devices() const {
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(_instance, &device_count, nullptr);
 

@@ -69,6 +69,7 @@ private:
         const VkDebugUtilsMessengerCallbackDataEXT* data,
         void* user_data);
 
+    vkw::instance _instance;
     vkw::surface _surface;
 
     // family and index

@@ -35,7 +35,7 @@ private:
         util::size_pt data_id;
     } desc_id;
 };
-
+// TODO : separate frame interface from resources
 class resource_manager {
 public:
     resource_manager(const graphics_instance& instance);
@@ -96,12 +96,11 @@ private:
         VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, POOL_CAPACITY }
     };
 
+    renderer _renderer;
+    frame_context _frame_ctx;
+
     vkw::queue_graphics _graphics_queue;
     vkw::queue_transfer _transfer_queue;
-
-    renderer _renderer;
-
-    frame_context _frame_ctx;
 
     // meshes, samplers and pipelines in an unurdered map where size_t is a dab asset hash value for fast user level lookup
     // meshes and samplers don't need to be contiguous so can be a persistent array if not for dab hashes

@@ -18,15 +18,15 @@ VKAPI_ATTR VkBool32 VKAPI_CALL graphics_instance::debug_callback(
     return VK_FALSE;
 }
 
-graphics_instance::graphics_instance(wsi::native_handle window) {
+graphics_instance::graphics_instance(wsi::native_handle window) :
 #ifdef VKW_ENABLE_VAL_LAYERS
-    vkw::instance_main::create(EXTENSIONS, VAL_LAYERS, debug_callback);
+    _instance(EXTENSIONS, VAL_LAYERS, debug_callback),
 #else
-    vkw::instance_main::create(EXTENSIONS, {}, nullptr);
+    _instance(EXTENSIONS, {}, nullptr),
 #endif
-
-    _surface = vkw::surface(window);
-    const auto phys_devices = vkw::instance_main::enumerate_physical_devices();
+    _surface(&_instance, window)
+{
+    const auto phys_devices = _instance.enumerate_physical_devices();
     VkPhysicalDevice phys_device = VK_NULL_HANDLE;
     // NOTE : requested settings or bust, can write a few lines to have fallback options
     for (const auto device : phys_devices) {
@@ -109,9 +109,6 @@ graphics_instance::graphics_instance(wsi::native_handle window) {
 
 graphics_instance::~graphics_instance() {
     vkw::device_main::destroy();
-    _surface = vkw::surface{}; // HACK to get around singleton ugliness
-    vkw::instance_main::destroy(); // TODO : global device I can bear, global instance I can not
-    // see surface destructor and despair
 }
 
 }

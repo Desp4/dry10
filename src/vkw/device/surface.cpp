@@ -7,22 +7,22 @@
 
 namespace dry::vkw {
 
-surface::surface(wsi::native_handle handle) {
+surface::surface(const instance* inst, wsi::native_handle handle) :
+    _instance(inst)
+{
 #ifdef _WIN32
     VkWin32SurfaceCreateInfoKHR surface_info{};
     surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
     surface_info.hinstance = GetModuleHandle(nullptr);
     surface_info.hwnd = static_cast<HWND>(handle);
 
-    vkCreateWin32SurfaceKHR(instance_main::instance(), &surface_info, NULL_ALLOC, &_surface);
+    vkCreateWin32SurfaceKHR(_instance->vk_instance(), &surface_info, NULL_ALLOC, &_surface);
 #endif
 }
 
 surface::~surface() {
-    // TODO : get rid of global instance, it serves little purpose and forces to perform this check
-    // when graphics lifetime need to free a surface after deleting instance
-    if (_surface) {
-        vkDestroySurfaceKHR(instance_main::instance(), _surface, NULL_ALLOC);
+    if (_instance) {
+        vkDestroySurfaceKHR(_instance->vk_instance(), _surface, NULL_ALLOC);
     }   
 }
 

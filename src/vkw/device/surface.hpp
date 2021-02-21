@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vkw/vkw.hpp"
+#include "instance.hpp"
 #include "window/window.hpp"
 
 namespace dry::vkw {
@@ -11,7 +11,7 @@ public:
 
     surface() = default;
     surface(surface&&) = default;
-    surface(wsi::native_handle handle);
+    surface(const instance* inst, wsi::native_handle handle);
     ~surface();
 
     const VkSurfaceKHR& vk_surface() const {
@@ -19,6 +19,7 @@ public:
     }
 
 private:
+    nullable_ptr<const instance> _instance;
     vk_handle<VkSurfaceKHR> _surface;
 };
 
