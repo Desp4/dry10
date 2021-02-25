@@ -31,4 +31,8 @@ native_handle window::window_handle() const {
     return glfwGetWin32Window(_window);
 }
 
+void window::set_title(const std::string& title) {
+    glfwSetWindowTitle(_window, title.c_str());
+}
+
 }

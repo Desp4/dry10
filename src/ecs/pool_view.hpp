@@ -30,7 +30,7 @@ public:
         view_iterator& operator++() {
             do {
                 ++_it;
-            } while (_it != _end && contains());
+            } while (_it != _end && !contains());
             return *this;
         }
         view_iterator& operator++(int) {

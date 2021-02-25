@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include <GLFW/glfw3.h>
 
 #include "util/util.hpp"
@@ -29,6 +31,7 @@ public:
     bool should_close() const;
     void poll_events() const;
     native_handle window_handle() const;
+    void set_title(const std::string& title);
 
 private:
     util::nullable_ptr<GLFWwindow> _window;

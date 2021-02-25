@@ -1,7 +1,6 @@
 #pragma once
-#include "ecs/ecs.hpp"
+
 #include "resman.hpp"
-#include "asset/assetreg.hpp"
 
 namespace dry::gr {
 
@@ -16,17 +15,15 @@ public:
 
     void begin_render();
 
-private:
-    wsi::window _window;
-    graphics_instance _gr_instance;
-
 protected:
     virtual void on_start() = 0;
     virtual void update() = 0;
 
+    wsi::window _window;
+private:
+    graphics_instance _gr_instance;
+protected:
     resource_manager _res_man;
-    asset::asset_registry _asset_reg;
-    ecs::ec_registry _ec_reg;
 };
 
 }
