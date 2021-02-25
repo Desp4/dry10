@@ -6,7 +6,7 @@ namespace dry::util {
 
 using id_type = uint32_t;
 
-template<uint32_t It_Instance>
+template<typename Owner>
 struct type_id_iterator {
     static id_type advance() {
         static id_type value{};
@@ -14,10 +14,10 @@ struct type_id_iterator {
     }
 };
 
-template<typename T, uint32_t It_Instance>
+template<typename T, typename Owner>
 struct type_id {
     static id_type value() {
-        static const id_type ret = type_id_iterator<It_Instance>::advance();
+        static const id_type ret = type_id_iterator<Owner>::advance();
         return ret;
     }
 };

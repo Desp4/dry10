@@ -20,7 +20,7 @@ public:
     template<class T>
     using hashmap_pool = std::unordered_map<std::string, T>;
     template<class T>
-    using asset_type_id = util::type_id<T, 0>;
+    using asset_type_id = util::type_id<T, asset_registry>;
 
     template<asset_constructible T>
     const T& get(const std::string& name);
@@ -63,7 +63,7 @@ void asset_registry::load(const std::string& name) {
     const auto t_id = asset_type_id<T>::value();
 
     if (t_id >= _asset_pools.size()) {
-        _asset_pools.resize(_asset_pools.size() + 1);
+        _asset_pools.resize(t_id + 1);
         _asset_pools[t_id] = hashmap_pool<T>{};
     }
 

@@ -1,5 +1,5 @@
 #pragma once
-
+#include "ecs/ecs.hpp"
 #include "resman.hpp"
 #include "asset/assetreg.hpp"
 
@@ -26,6 +26,7 @@ protected:
 
     resource_manager _res_man;
     asset::asset_registry _asset_reg;
+    ecs::ec_registry _ec_reg;
 };
 
 }
