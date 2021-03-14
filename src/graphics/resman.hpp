@@ -15,6 +15,8 @@
 
 #include "asset/meshasset.hpp"
 
+#include "desc_pool_pool.hpp"
+
 namespace dry::gr {
 
 template<typename T>
@@ -61,11 +63,12 @@ private:
     };
     struct persistent_recording_data {
         size_t mesh_id;
-        vkw::descriptor_sets descriptor_sets;
+        std::vector<VkDescriptorSet> descriptor_sets;
     };
     struct pipeline_group {
         vkw::pipeline_graphics pipeline;
         util::sparse_set<persistent_recording_data> recording_data;
+        descriptor_pool_pool textured_desc_pool; // TODO : think about descriptors
         vkw::descriptor_layout layout;
         uint32_t true_size;
     };
@@ -79,7 +82,7 @@ private:
         uint8_t expired_count;
     };
 
-    constexpr static uint32_t POOL_CAPACITY = 512;
+    constexpr static uint32_t POOL_CAPACITY = 128;
     // TODO : hardcoded part until compile time reflection arrives
     // NOTE : on sizes:
     //      poolSize - max number of this descriptor type used across all allocated descriptors
@@ -114,10 +117,6 @@ private:
 
     std::unordered_map<size_t, pipeline_group> _pipeline_groups;
     std::deque<expired_renderable> _expired_recording_datas;
-
-    // TODO : hardcoded desc types, should be solved on compile time reflection
-    // TODO : only one pool, should be dynamically allocated if ran out
-    vkw::descriptor_pool _desc_pool;
 };
 
 }

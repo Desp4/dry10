@@ -5,7 +5,6 @@ namespace dry::gr {
 
 resource_manager::resource_manager(const graphics_instance& instance) :
     _renderer(instance),
-    _desc_pool(POOL_SIZES, POOL_CAPACITY),
     _ubos(_renderer.image_count())
 {
     queue_ind_info queue_data = instance.graphics_queue();
@@ -38,6 +37,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
         new_pipeline.layout = vkw::descriptor_layout(vk_data.layout_bindings);
         new_pipeline.true_size = 1;
         new_pipeline.pipeline = _renderer.create_pipeline(mat, new_pipeline.layout);
+        new_pipeline.textured_desc_pool = descriptor_pool_pool{ POOL_SIZES, POOL_CAPACITY, new_pipeline.layout.layout() };
 
         curr_pipeline = &_pipeline_groups.emplace(mat.shader->hash(), std::move(new_pipeline)).first->second;
     }
@@ -123,7 +123,10 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
     }
 
     // TODO : assume layoutBinding descriptor types are present in a pool, see compile time reflection
-    new_recording_data.descriptor_sets = _desc_pool.create_sets(curr_pipeline->layout.layout(), _renderer.image_count());
+    new_recording_data.descriptor_sets.resize(_renderer.image_count());
+    for (auto& desc_set : new_recording_data.descriptor_sets) {
+        desc_set = curr_pipeline->textured_desc_pool.get_descriptor_set();
+    }
 
     // create ubos for each frame image
     new_renderable.ubo_ids.reserve(vk_data.buffer_infos.size());
@@ -175,7 +178,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
 
             desc_writes[vk_data.buffer_infos[j].binding_ind].pBufferInfo = &buf_info;
         }
-        _desc_pool.update_descriptor_set(new_recording_data.descriptor_sets[i], desc_writes);
+        curr_pipeline->textured_desc_pool.update_descriptor_set(new_recording_data.descriptor_sets[i], desc_writes);
     }
 
     new_renderable.desc_id.data_id = curr_pipeline->recording_data.emplace(std::move(new_recording_data));
@@ -215,6 +218,13 @@ void resource_manager::advance_frame() {
             ++p;
         }
         else {
+            auto rend_group_it = _pipeline_groups.find(p->pipeline_id);
+
+            // return descriptor sets
+            for (const auto desc_set : p->recording_data.descriptor_sets) {
+                rend_group_it->second.textured_desc_pool.return_descriptor_set(desc_set);
+            }
+
             // destroy buffers
             for (auto& frame_ubos : _ubos) {
                 for (const util::size_pt ubo_id : p->ubo_ids) {
@@ -244,7 +254,6 @@ void resource_manager::advance_frame() {
             }
 
             // pipeline
-            auto rend_group_it = _pipeline_groups.find(p->pipeline_id);
             rend_group_it->second.true_size -= 1;
 
             if (rend_group_it->second.true_size == 0) {

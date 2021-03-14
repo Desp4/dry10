@@ -16,8 +16,7 @@ descriptor_pool::~descriptor_pool() {
     vkDestroyDescriptorPool(device_main::device(), _pool, NULL_ALLOC);
 }
 
-descriptor_sets descriptor_pool::create_sets(VkDescriptorSetLayout layout, uint32_t count) const {
-    descriptor_sets sets(count);
+void descriptor_pool::create_sets(VkDescriptorSet* beg, VkDescriptorSetLayout layout, uint32_t count) const {
     const std::vector<VkDescriptorSetLayout> layouts(count, layout);
 
     VkDescriptorSetAllocateInfo set_info{};
@@ -25,15 +24,7 @@ descriptor_sets descriptor_pool::create_sets(VkDescriptorSetLayout layout, uint3
     set_info.descriptorPool = _pool;
     set_info.descriptorSetCount = count;
     set_info.pSetLayouts = layouts.data();
-    vkAllocateDescriptorSets(device_main::device(), &set_info, sets.data());
-    return sets;
-}
-
-void descriptor_pool::update_descriptor_set(VkDescriptorSet set, std::span<VkWriteDescriptorSet> descriptor_writes) const {
-    for (auto& write : descriptor_writes) {
-        write.dstSet = set; // TODO : kinda dumb modifying the writes here, move it to descriptor?
-    }
-    vkUpdateDescriptorSets(device_main::device(), descriptor_writes.size(), descriptor_writes.data(), 0, nullptr);
+    vkAllocateDescriptorSets(device_main::device(), &set_info, beg);
 }
 
 }
