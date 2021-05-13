@@ -1,14 +1,13 @@
 cmake_minimum_required(VERSION 3.12)
+include(FetchDeps.cmake)
 
-project(dry1)
+project(dry-collection)
 
-set(CMAKE_CXX_STANDARD 20)
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
-set(DRY1_SHPB_INC "${PROJECT_SOURCE_DIR}/tools/dab/include")
-set(DRY1_MAIN_SRC "${PROJECT_SOURCE_DIR}/src")
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_find)
+fetch_all_deps()
 
-add_subdirectory("${PROJECT_SOURCE_DIR}/tools/dab" "${CMAKE_CURRENT_BINARY_DIR}/dab_build")
-add_subdirectory("${PROJECT_SOURCE_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/dry_build")
-
-# tests
-add_subdirectory("${PROJECT_SOURCE_DIR}/tests/sandbox" "${CMAKE_CURRENT_BINARY_DIR}/sandbox_build")
+add_subdirectory(tools/dab ${PROJECT_BINARY_DIR}/tools/dab)
+add_subdirectory(src ${PROJECT_BINARY_DIR}/dry1)
+add_subdirectory(tests/sandbox ${PROJECT_BINARY_DIR}/tests/sandbox)

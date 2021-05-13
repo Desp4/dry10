@@ -1,4 +1,6 @@
 #include "resman.hpp"
+
+#include "asset/vk_reflect.hpp"
 #include "dbg/log.hpp"
 
 namespace dry::gr {
@@ -15,7 +17,7 @@ resource_manager::resource_manager(const graphics_instance& instance) :
 }
 
 renderable resource_manager::create_renderable(const material& mat, const asset::mesh_asset& mesh) {
-    dab::shader_vk_data vk_data = mat.shader->vk_data();
+    asset::vk_shader_data vk_data = asset::shader_vk_info(*mat.shader);
     // sort so that ubo bindings are in increasing order
     std::sort(vk_data.buffer_infos.begin(), vk_data.buffer_infos.end(),
         [&bind_table = vk_data.layout_bindings](auto&& l, auto&& r) {
@@ -30,8 +32,8 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
     LOG_DBG("creating renderable[0x%08x; 0x%08x]", &mat, &mesh);
 
     // check descriptors
-    if (!_pipeline_groups.contains(mat.shader->hash())) {
-        LOG_DBG("shader[hash 0x%08x] not registered, creating a pipeline", mat.shader->hash());
+    if (!_pipeline_groups.contains(mat.shader->hash)) {
+        LOG_DBG("shader[hash 0x%08x] not registered, creating a pipeline", mat.shader->hash);
 
         struct pipeline_group new_pipeline;
         new_pipeline.layout = vkw::descriptor_layout(vk_data.layout_bindings);
@@ -39,18 +41,18 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
         new_pipeline.pipeline = _renderer.create_pipeline(mat, new_pipeline.layout);
         new_pipeline.textured_desc_pool = descriptor_pool_pool{ POOL_SIZES, POOL_CAPACITY, new_pipeline.layout.layout() };
 
-        curr_pipeline = &_pipeline_groups.emplace(mat.shader->hash(), std::move(new_pipeline)).first->second;
+        curr_pipeline = &_pipeline_groups.emplace(mat.shader->hash, std::move(new_pipeline)).first->second;
     }
     else {
-        LOG_DBG("shader[asset 0x%08x] present, binding object", mat.shader->hash());
-        curr_pipeline = &_pipeline_groups[mat.shader->hash()];
+        LOG_DBG("shader[asset 0x%08x] present, binding object", mat.shader->hash);
+        curr_pipeline = &_pipeline_groups[mat.shader->hash];
         curr_pipeline->true_size += 1;
     }
-    new_renderable.desc_id.pipeline_id = mat.shader->hash();
+    new_renderable.desc_id.pipeline_id = mat.shader->hash;
 
     // check meshes
-    if (!_mesh_buffers.contains(mesh.hash())) {
-        LOG_DBG("mesh[hash 0x%08x] not registered, allocating buffers", mesh.hash());
+    if (!_mesh_buffers.contains(mesh.hash)) {
+        LOG_DBG("mesh[hash 0x%08x] not registered, allocating buffers", mesh.hash);
 
         mesh_data new_mesh;
         new_mesh.index_buffer = _transfer_queue.create_local_buffer(
@@ -64,28 +66,29 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
             mesh.vertices.data()
         );
 
-        _mesh_buffers.emplace(mesh.hash(), refcounted_t<mesh_data>{std::move(new_mesh), 1});
+        _mesh_buffers.emplace(mesh.hash, refcounted_t<mesh_data>{std::move(new_mesh), 1});
     }
     else {
-        LOG_DBG("mesh[hash 0x%08x] registered, binding object", mesh.hash());
-        _mesh_buffers[mesh.hash()].count += 1;
+        LOG_DBG("mesh[hash 0x%08x] registered, binding object", mesh.hash);
+        _mesh_buffers[mesh.hash].count += 1;
     }
-    new_recording_data.mesh_id = mesh.hash();
+    new_recording_data.mesh_id = mesh.hash;
 
     // check textures, texture array order assumed to match that of shader combImageInfos field
     // TODO : if no texture provided and shader needs one should use a fallback
-    PANIC_ASSERT(mat.textures.size() == vk_data.comb_sampler_infos.size(),
-        "material texture count does not match that of a shader's: material has %zu, shader has %zu",
-        mat.textures.size(), vk_data.comb_sampler_infos.size()
-    );
+    if (mat.textures.size() != vk_data.comb_sampler_infos.size()) {
+        LOG_ERR("material texture count does not match that of a shader's: material has %zu, shader has %zu",
+            mat.textures.size(), vk_data.comb_sampler_infos.size());
+        dbg::panic();
+    }
 
     new_renderable.sampler_ids.reserve(mat.textures.size());
     for (const auto& texture : mat.textures) {
-        if (!_combined_samplers.contains(texture->hash())) {
-            LOG_DBG("texture[hash 0x%08x] not registered, allocating combined sampler", texture->hash());
+        if (!_combined_samplers.contains(texture->hash)) {
+            LOG_DBG("texture[hash 0x%08x] not registered, allocating combined sampler", texture->hash);
 
             combined_sampler_data new_comb_sampler;
-            const uint32_t mip_levels = std::log2((std::max)(texture->width, texture->height));
+            const uint32_t mip_levels = static_cast<uint32_t>(std::log2((std::max)(texture->width, texture->height)));
 
             vkw::buffer_base staging_buffer(
                 texture->width * texture->height * texture->channels, // NOTE : assuming 8bit color
@@ -99,7 +102,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
                 VkExtent2D{ texture->width, texture->height },
                 mip_levels,
                 VK_SAMPLE_COUNT_1_BIT,
-                texture->texture_format(),
+                asset::texture_vk_format(*texture),
                 VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -113,13 +116,13 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
             _graphics_queue.generate_mip_maps(new_comb_sampler.texture.image());
 
             new_comb_sampler.sampler = vkw::tex_sampler(mip_levels);
-            _combined_samplers.emplace(texture->hash(), refcounted_t<combined_sampler_data>{std::move(new_comb_sampler), 1});
+            _combined_samplers.emplace(texture->hash, refcounted_t<combined_sampler_data>{std::move(new_comb_sampler), 1});
         }
         else {
-            LOG_DBG("texture[hash 0x%08x] registered, binding object", texture->hash());
-            _combined_samplers[texture->hash()].count += 1;
+            LOG_DBG("texture[hash 0x%08x] registered, binding object", texture->hash);
+            _combined_samplers[texture->hash].count += 1;
         }
-        new_renderable.sampler_ids.push_back(texture->hash());
+        new_renderable.sampler_ids.push_back(texture->hash);
     }
 
     // TODO : assume layoutBinding descriptor types are present in a pool, see compile time reflection
@@ -286,7 +289,7 @@ void resource_manager::submit_frame() {
             pipeline_group.pipeline.bind_descriptor_sets(
                 cmd_buf, std::span{ record_data.descriptor_sets.data() + _frame_ctx.frame_index, 1 }
             );
-            vkCmdDrawIndexed(cmd_buf, record_mesh.index_buffer.size() / sizeof(uint32_t), 1, 0, 0, 0);
+            vkCmdDrawIndexed(cmd_buf, static_cast<uint32_t>(record_mesh.index_buffer.size() / sizeof(uint32_t)), 1, 0, 0, 0);
         }
     }
     _renderer.submit_frame(_frame_ctx);

@@ -1,6 +1,7 @@
 #include "ecs/ecs.hpp"
 #include "graphics/dryprogram.hpp"
 #include "asset/assetreg.hpp"
+#include "util/fs.hpp"
 
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
@@ -8,18 +9,10 @@
 // NOTE : just a dumb test, don't cry about the quality yet
 class sandbox_program : public dry::gr::dry_program {
 public:
-    sandbox_program() :
-        dry::gr::dry_program()
-    {
-        const std::string name = "viking_room";
-        _asset_reg.add_resource_block("../../../tests/sandbox/assets/blob.dab");
-        _asset_reg.load<dry::asset::mesh_asset>(name);
-        _asset_reg.load<dry::asset::shader_asset>("def");
-        _asset_reg.load<dry::asset::texture_asset>(name);
-    }
-
 protected:
     void on_start() override {
+        _asset_reg.load_archive(dry::g_exe_dir.string() + "/assets.zip");
+
         dry::gr::material material;
         material.shader = &_asset_reg.get<dry::asset::shader_asset>("def");
         material.textures.resize(1);
@@ -32,21 +25,21 @@ protected:
                 // create ubo interface
                 UBO ubo;
                 ubo.proj = glm::perspective(
-                    glm::radians(80.0f),
+                    glm::radians(60.0f),
                     dry_program::DEFAULT_WIN_WIDTH / float(dry_program::DEFAULT_WIN_HEIGHT),
                     0.1f,
                     64.0f
                 );
                 ubo.proj[1][1] *= -1;
-                ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-                ubo.model = glm::scale(ubo.model, { 0.5f, 0.5f, 0.5f });
+                ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+                ubo.model = glm::scale(ubo.model, { 0.08f, 0.08f, 0.08f });
                 const glm::vec3 front = {
                     cos(0) + cos(0),
                     sin(0),
                     sin(0) * cos(0) };
                 const glm::vec3 up{ 0.0f, 1.0f, 0.0f };
                 const glm::vec3 origin{ 0.0f, 0.0f, 0.0f };
-                const glm::vec3 objPos{ 2.0f + i, y, z };
+                const glm::vec3 objPos{ 20.0f + i, y, z };
                 const auto view = glm::lookAt(origin, origin + front, up);
                 ubo.view = glm::translate(view, objPos);
 
@@ -58,14 +51,7 @@ protected:
             }
         };
         
-        populate(64, -0.5f, -1.0f);
-        populate(64, -0.5f, 1.0f);
-        populate(64, 0.5f, -1.0f);
-        populate(64, 0.5f, 1.0f);
-        populate(64, -1.5f, -1.0f);
-        populate(64, -1.5f, 1.0f);
-        populate(64, 1.5f, -1.0f);
-        populate(64, 1.5f, 1.0f);
+        populate(1, -3.0f, 1.0f);
     }
     void update() override {
         static auto prev_time = std::chrono::high_resolution_clock::now();
@@ -81,7 +67,7 @@ protected:
         for (auto entity : comp_view) {
             auto [renderable, ubo] = comp_view.get<dry::gr::renderable, UBO>(entity);
 
-            ubo.model = glm::rotate(ubo.model, static_cast<float>(1.0f * dt), glm::vec3(0.0f, 0.0f, 1.0f));
+            ubo.model = glm::rotate(ubo.model, static_cast<float>(1.0f * dt), glm::vec3(0.0f, 1.0f, 0.0f));
             _res_man.write_to_buffer(renderable, 0, &ubo, sizeof ubo);
         }
     }

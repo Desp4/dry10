@@ -41,7 +41,10 @@ graphics_instance::graphics_instance(wsi::native_handle window) :
         }
     }
 
-    PANIC_ASSERT(phys_device != VK_NULL_HANDLE, "no suitable device found");
+    if (phys_device == VK_NULL_HANDLE) {
+        LOG_ERR("no suitable device found");
+        dbg::panic();
+    }
     // further down just figuring out queue indices up until the very end
 
     // NOTE : graphics needs a compute or sparse binding for transition img layout, idk which one
@@ -56,7 +59,10 @@ graphics_instance::graphics_instance(wsi::native_handle window) :
 
     // get all queues, prefer dedicated, if not pick the first that satisfies the usage
     tmp_queue_index = vkw::conf::get_present_index(queue_families, phys_device, _surface.vk_surface());
-    PANIC_ASSERT(tmp_queue_index != -1, "could not find present queue");
+    if (tmp_queue_index == -1) {
+        LOG_ERR("could not find present queue");
+        dbg::panic();
+    }
     family_inds[0] = &_present_queue;
     family_inds[0]->family_ind = tmp_queue_index;
 

@@ -1,87 +1,95 @@
 #pragma once
 
-#include <array>
-#include <filesystem>
+#ifndef DRY_FILESYS_H
+#define DRY_FILESYS_H
 
-#include "dab/import.hpp"
+#include <filesystem>
+#include <optional>
+
+#include <zip.h>
+
+#include "asset_src.hpp"
 #include "dbg/log.hpp"
 
 namespace dry::asset {
 
 class filesystem final {
 public:
-    void add_file(const std::filesystem::path& dab_file);
+    filesystem();
+    filesystem(filesystem&& oth) { *this = std::move(oth); }
+    ~filesystem();
 
-    template<class T>
-    std::pair<T, size_t> load_asset_whash(const std::string& name);
+    bool open_archive(const std::filesystem::path& path);
+    bool drop_archive();
 
-    void load_block(const std::filesystem::path& block_name);
-    void unload_current_block();
-    void clear();
+    template<typename Asset>
+    Asset load_asset(const std::string& name);
+    template<typename Asset>
+    hash_t compute_hash(const std::string& name);
+
+    filesystem& operator=(filesystem&& oth);
 
 private:
-    struct asset_decl_strip {
-        std::string name;
-        size_t offset;
-    };
+    static constexpr std::string_view _fallback_path = "res/asset_fallback.zip"; // has to be with the exe
+    static constexpr std::string_view _fallback_name = "fb";
+    static filesystem& fallback_fs();
 
-    struct asset_block {
-        std::filesystem::path path;
-        std::array<std::vector<asset_decl_strip>, static_cast<size_t>(dab::asset_type::VALUE_COUNT)> assets;
-    };
+    std::optional<byte_vec> read_file(std::string_view name);
+    std::optional<byte_vec> read_fallback(std::string_view ext);
+    template<typename Asset>
+    hash_t fallback_hash();
 
-    std::vector<asset_block> _blocks;
-
-    dab::dab_importer _importer;
-    decltype(_blocks)::const_iterator _curr_block = _blocks.end();
+    std::string _arch_path; // for ease of debug
+    zip_t* _arch_handle;
+    u32_t _arch_id;
 };
 
 
 
-template<class T>
-std::pair<T, size_t> filesystem::load_asset_whash(const std::string& name) {
-    constexpr size_t type_int = static_cast<size_t>(T::type);
+template<>
+mesh_source filesystem::load_asset(const std::string&);
+template<>
+texture_source filesystem::load_asset(const std::string&);
+template<>
+shader_source filesystem::load_asset(const std::string&);
 
-    auto search_lambda = [&name](const asset_decl_strip& oth) {
-        return oth.name == name;
-    };
-    decltype(asset_block::assets)::value_type::const_iterator asset_it;
-    if (_curr_block != _blocks.end()) {
-        asset_it = std::find_if(_curr_block->assets[type_int].begin(), _curr_block->assets[type_int].end(), search_lambda);
+template<typename Asset>
+Asset filesystem::load_asset(const std::string&) {
+    static_assert(false, "Unsupported asset type");
+}
+
+template<typename Asset>
+hash_t filesystem::compute_hash(const std::string& name) {
+    const std::string full_name = name + asset_source_ext_v<Asset>.data();
+
+    const zip_int64_t ind = zip_name_locate(_arch_handle, full_name.data(), ZIP_FL_ENC_GUESS);
+    if (ind < 0) {
+        LOG_ERR("Asset %s not found", full_name.data());
+        return fallback_hash<Asset>();
+    }
+    else if (ind > (std::numeric_limits<u32_t>::max)()) {
+        LOG_WRN("Asset %s index overflow, hash collision possible", full_name.data());
     }
 
-    // NOTE : doing loading automatically, may delete it if not needed
-    if (_curr_block == _blocks.end() || asset_it == _curr_block->assets[type_int].end()) {
-        LOG_WRN("asset %s not found in loaded block, checking others", name.c_str());
-        for (auto p = _blocks.begin(); p != _blocks.end(); ++p) {
-            // sure whatever
-            if (p == _curr_block) {
-                continue;
-            }               
+    return (static_cast<hash_t>(_arch_id) << 32) | ind; // NOTE : assume hash is 64, otherwise it introduces collisions anyway
+}
 
-            asset_it = std::find_if(p->assets[type_int].begin(), p->assets[type_int].end(), search_lambda);
-            if (asset_it != p->assets[type_int].end()) {
-                _curr_block = p;
-                _importer.open(p->path);
+template<typename Asset>
+hash_t filesystem::fallback_hash() {
+    constexpr hash_t id_mask = static_cast<hash_t>((std::numeric_limits<u32_t>::max)()) << 32;
 
-                LOG_DBG("loaded asset block %s", p->path.filename().string().c_str());
-                break;
-            }
-        }
-        PANIC_ASSERT(asset_it != _blocks.back().assets[type_int].end(), "could not find asset %s", name.c_str());
+    const std::string full_name = std::string{ _fallback_name } + asset_source_ext_v<Asset>.data();
+    const zip_int64_t ind = zip_name_locate(_arch_handle, full_name.data(), ZIP_FL_ENC_GUESS);
+    if (ind < 0) {
+        LOG_ERR("No fallback asset %s found", full_name.data());
+        dbg::panic();
     }
-
-    // asset hash
-    // higher 16 bits - block index in _blocks array, remaining 48 - offset in file
-    static_assert(sizeof(size_t) == 8);
-    const size_t block_ind = _curr_block - _blocks.begin();
-    WRN_ASSERT(block_ind <= 0xFFFF, "asset %s has block index greater than 2^16, possible collision", name.c_str());
-
-    size_t ret_hash = asset_it->offset;
-    WRN_ASSERT(ret_hash <= 0xFFFFFFFFFFFF, "asset %s has dab offset greater than 2^48 bits, possible collision", name.c_str());
-    ret_hash |= block_ind << (64 - 16);
-
-    return { _importer.read<T>(asset_it->offset), ret_hash };
+    else if (ind > (std::numeric_limits<u32_t>::max)()) {
+        LOG_WRN("Asset %s index overflow, hash collision possible", full_name.data()); // to be safe
+    }
+    return (ind & id_mask); // don't care about archive id, fill with 1s
 }
 
 }
+
+#endif

@@ -66,7 +66,7 @@ void queue_graphics::generate_mip_maps(const image_base& image) const {
     barrier.subresourceRange.levelCount = 1;
 
     int32_t mipWidth = image.extent().width, mipHeight = image.extent().height;
-    for (int i = 1; i < image.mip_levels(); ++i) {
+    for (auto i = 1u; i < image.mip_levels(); ++i) {
         barrier.subresourceRange.baseMipLevel = i - 1;
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;

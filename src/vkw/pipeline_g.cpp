@@ -4,7 +4,7 @@
 namespace dry::vkw {
 
 pipeline_graphics::pipeline_graphics(const render_pass& pass, VkExtent2D extent, std::span<const shader_module> modules,
-    const dab::shader_vk_data& shader_data, std::span<const VkDescriptorSetLayout> layouts)
+    const asset::vk_shader_data& shader_data, std::span<const VkDescriptorSetLayout> layouts)
 {
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
     shader_stages.reserve(modules.size());
@@ -25,7 +25,7 @@ pipeline_graphics::pipeline_graphics(const render_pass& pass, VkExtent2D extent,
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input_info.vertexBindingDescriptionCount = 1;
     vertex_input_info.pVertexBindingDescriptions = &shader_data.vertex_binding;
-    vertex_input_info.vertexAttributeDescriptionCount = shader_data.vertex_descriptors.size();
+    vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(shader_data.vertex_descriptors.size());
     vertex_input_info.pVertexAttributeDescriptions = shader_data.vertex_descriptors.data();
 
     VkPipelineInputAssemblyStateCreateInfo assembly_info{};
@@ -36,8 +36,8 @@ pipeline_graphics::pipeline_graphics(const render_pass& pass, VkExtent2D extent,
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = extent.width;
-    viewport.height = extent.height;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
@@ -112,14 +112,14 @@ pipeline_graphics::pipeline_graphics(const render_pass& pass, VkExtent2D extent,
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount = layouts.size();
+    pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(layouts.size());
     pipeline_layout_info.pSetLayouts = layouts.data();
     pipeline_layout_info.pushConstantRangeCount = 0;
     vkCreatePipelineLayout(device_main::device(), &pipeline_layout_info, NULL_ALLOC, &_pipeline_layout);
 
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipeline_info.stageCount = shader_stages.size();
+    pipeline_info.stageCount = static_cast<uint32_t>(shader_stages.size());
     pipeline_info.pStages = shader_stages.data();
     pipeline_info.pVertexInputState = &vertex_input_info;
     pipeline_info.pInputAssemblyState = &assembly_info;
@@ -152,7 +152,7 @@ void pipeline_graphics::bind_descriptor_sets(VkCommandBuffer buf, std::span<cons
 {
     vkCmdBindDescriptorSets(
         buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline_layout,
-        0, sets.size(), sets.data(), 0, nullptr
+        0, static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr
     );
 }
 

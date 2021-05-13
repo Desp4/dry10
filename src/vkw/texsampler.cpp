@@ -21,7 +21,7 @@ tex_sampler::tex_sampler(uint32_t mip_levels) {
     sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     sampler_info.mipLodBias = 0.0f;
     sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = mip_levels;
+    sampler_info.maxLod = static_cast<float>(mip_levels); // NOTE : remind me?
     vkCreateSampler(device_main::device(), &sampler_info, NULL_ALLOC, &_sampler);
 }
 

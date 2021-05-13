@@ -34,12 +34,14 @@ renderer::renderer(const graphics_instance& instance) {
 
 vkw::pipeline_graphics renderer::create_pipeline(const material& material, const vkw::descriptor_layout& layout) const {
     std::vector<vkw::shader_module> shader_modules;
-    shader_modules.reserve(material.shader->modules.size());
-    for (const auto& shader_bin : material.shader->modules) {
-        shader_modules.emplace_back(shader_bin.module_data, static_cast<vkw::shader_type>(shader_bin.stage));
+    shader_modules.reserve(material.shader->oth_stages.size() + 1);
+    shader_modules.emplace_back(material.shader->vert_stage.spirv, static_cast<vkw::shader_type>(asset::shader_vk_stage(material.shader->vert_stage.stage)));
+
+    for (const auto& shader_bin : material.shader->oth_stages) {
+        shader_modules.emplace_back(shader_bin.spirv, static_cast<vkw::shader_type>(asset::shader_vk_stage(shader_bin.stage)));
     }
     return vkw::pipeline_graphics(
-        _render_pass, _surface_extent, shader_modules, material.shader->vk_data(),
+        _render_pass, _surface_extent, shader_modules, asset::shader_vk_info(*material.shader),
         std::span{ &layout.layout(), 1 }
     );
 }

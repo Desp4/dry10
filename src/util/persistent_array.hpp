@@ -15,6 +15,8 @@ class persistent_array : public assignable<persistent_array<T>> {
 public:
     using assignable<persistent_array>::operator=;
     union union_t {
+        ~union_t() = delete;
+
         T type;
         size_pt available;
     };

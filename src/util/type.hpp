@@ -4,7 +4,7 @@
 
 namespace dry::util {
 
-using id_type = uint32_t;
+using id_type = std::uint32_t;
 
 template<typename Owner>
 struct type_id_iterator {

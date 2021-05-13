@@ -13,7 +13,7 @@
 #include "vkw/texsampler.hpp"
 #include "vkw/desc/descpool.hpp"
 
-#include "asset/meshasset.hpp"
+#include "asset/asset_src.hpp"
 
 #include "desc_pool_pool.hpp"
 

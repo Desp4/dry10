@@ -19,7 +19,7 @@ public:
 
     shader_module() = default;
     shader_module(shader_module&&) = default;
-    shader_module(std::span<const uint32_t> bin, shader_type type);
+    shader_module(std::span<const std::byte> bin, shader_type type);
     ~shader_module();
 
     const VkShaderModule& sh_module() const {

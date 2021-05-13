@@ -6,5 +6,10 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(dry_sandbox "${PROJECT_SOURCE_DIR}/src/main.cpp")
 
-target_include_directories(dry_sandbox PRIVATE ${DRY1_MAIN_SRC})
+target_include_directories(dry_sandbox PRIVATE "../../src")
 target_link_libraries(dry_sandbox PRIVATE dry1)
+
+add_custom_target(run_sandbox_dab
+    COMMAND dab 0 "${PROJECT_SOURCE_DIR}/assets" "${PROJECT_BINARY_DIR}/assets.zip"
+    COMMENT "archiving assets for sandbox")
+add_dependencies(dry_sandbox run_sandbox_dab)

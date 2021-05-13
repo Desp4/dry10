@@ -21,7 +21,7 @@ public:
 
     template<typename... Args>
     size_pt emplace(Args&&... args) {
-        const size_pt last_ind = _sparse.emplace(_dense.size());
+        const size_pt last_ind = _sparse.emplace(static_cast<size_pt>(_dense.size()));
         _dense.emplace_back(std::forward<Args>(args)...);
         _sparse_ref.push_back(last_ind);
         return last_ind;

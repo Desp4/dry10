@@ -1,48 +1,60 @@
 cmake_minimum_required(VERSION 3.12)
 
-project(dry1lib)
-
+project(dry1)
 set(CMAKE_CXX_STANDARD 20)
 
-set(DRY1_GLFW "" CACHE PATH "GLFW source directory")
-set(DRY1_GLM  "" CACHE PATH "GLM directory")
+set(VKW_SOURCES
+    vkw/buffer.cpp
+    vkw/framebuffer.cpp
+    vkw/memory.cpp
+    vkw/pipeline_g.cpp
+    vkw/renderpass.cpp
+    vkw/swapchain_p.cpp
+    vkw/texsampler.cpp
+    vkw/cmd/cmdbuffer.cpp
+    vkw/cmd/cmdpool.cpp
+    vkw/desc/desclayout.cpp
+    vkw/desc/descpool.cpp
+    vkw/device/defconf.cpp
+    vkw/device/device.cpp
+    vkw/device/instance.cpp
+    vkw/device/surface.cpp
+    vkw/image/image.cpp
+    vkw/image/imageview.cpp
+    vkw/queue/queue.cpp
+    vkw/queue/queue_graphics.cpp
+    vkw/queue/queue_transfer.cpp
+    vkw/shader/shader.cpp)
 
-set(VK_INC "$ENV{VULKAN_SDK}/Include")
-set(VK_LIB "$ENV{VULKAN_SDK}/Lib/vulkan-1.lib")
+set(WINDOW_SOURCES
+    window/window.cpp)
 
-add_subdirectory(${DRY1_GLFW} "${CMAKE_CURRENT_BINARY_DIR}/glfw_build")
+set(GRAPHICS_SOURCES
+    graphics/desc_pool_pool.cpp
+    graphics/dryprogram.cpp
+    graphics/grinstance.cpp
+    graphics/renderer.cpp
+    graphics/resman.cpp)
 
-file(GLOB_RECURSE VKW_SOURCES
-    "${PROJECT_SOURCE_DIR}/vkw/*.cpp")
+set(ASSET_SOURCES
+    asset/filesys.cpp
+    asset/shader_reflect.cpp)
 
-# tmp this one too
-file(GLOB_RECURSE WINDOW_SOURCES
-    "${PROJECT_SOURCE_DIR}/window/*.cpp")
-
-file(GLOB_RECURSE GRAPHICS_SOURCES
-    "${PROJECT_SOURCE_DIR}/graphics/*.cpp")
-
-file(GLOB_RECURSE ASSET_SOURCES
-    "${PROJECT_SOURCE_DIR}/asset/*.cpp")
-
-file(GLOB_RECURSE DEBUG_SOURCES
-    "${PROJECT_SOURCE_DIR}/dbg/*.cpp")
+set(UTIL_SOURCES
+    util/fs.cpp)
 
 add_library(dry1 STATIC
-    ${VKW_SOURCES}
+    ${VKW_SOURCES} 
     ${WINDOW_SOURCES}
     ${GRAPHICS_SOURCES}
     ${ASSET_SOURCES}
-    ${DEBUG_SOURCES})
+    ${UTIL_SOURCES})
 
-target_include_directories(dry1 PUBLIC
-    ${PROJECT_SOURCE_DIR}
-    ${DRY1_SHPB_INC}
-    ${VK_INC}
-    ${GLFW_HEADERS}
-    ${DRY1_GLM})
-
+target_include_directories(dry1 PUBLIC ${PROJECT_SOURCE_DIR})
 target_link_libraries(dry1 PUBLIC
-    ${VK_LIB}
+    vulkan
     glfw
-    dablib)
+    glm
+    zip
+    stb
+    spirv-cross-core)

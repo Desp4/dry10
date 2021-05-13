@@ -1,0 +1,93 @@
+#pragma once
+
+#ifndef DRY_ASSET_SRC_H
+#define DRY_ASSET_SRC_H
+
+#include <string_view>
+
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+
+#include "util/num.hpp"
+
+namespace dry::asset {
+
+enum class shader_stage{
+    vertex,
+    fragment
+};
+
+// source types
+// TODO : more vertex types
+struct mesh_source {
+    struct vertex {
+        glm::vec3 pos;
+        glm::vec2 tex;
+    };
+
+    std::vector<vertex> vertices;
+    std::vector<u32_t> indices;
+};
+
+struct texture_source {
+    byte_vec pixel_data;
+    u32_t width;
+    u32_t height;
+    u8_t channels;
+};
+
+struct shader_source {
+    struct shader_unit {
+        byte_vec spirv;
+        shader_stage stage;
+    };
+
+    shader_unit vert_stage;
+    std::vector<shader_unit> oth_stages;
+};
+
+// extension lookup
+template<typename>
+struct asset_source_ext {
+    static constexpr std::string_view ext = ".NULL";
+};
+
+template<>
+struct asset_source_ext<mesh_source> {
+    static constexpr std::string_view ext = ".mesh";
+};
+template<>
+struct asset_source_ext<texture_source> {
+    static constexpr std::string_view ext = ".texture";
+};
+template<>
+struct asset_source_ext<shader_source> {
+    static constexpr std::string_view vert_ext = ".vertex.shader";
+    static constexpr std::string_view frag_ext = ".fragment.shader";
+
+    static constexpr std::string_view ext = ".0.vertex.shader"; // NOTE : default to vertex, 0 always present
+};
+
+template<typename Asset>
+constexpr std::string_view asset_source_ext_v = asset_source_ext<Asset>::ext;
+
+// hashed type
+using hash_t = u64_t;
+
+template<typename T>
+struct hashed_asset : public T {
+    using T::T;
+    hashed_asset(const T& base, hash_t hash_val) : T{ base }, hash{ hash_val }{}
+    hashed_asset(T&& base, hash_t hash_val) : T{ std::move(base) }, hash{ hash_val }{}
+
+    hash_t hash;
+};
+
+// typedefs for common types
+using mesh_asset = hashed_asset<mesh_source>;
+using texture_asset = hashed_asset<texture_source>;
+using shader_asset = hashed_asset<shader_source>;
+
+}
+
+#endif

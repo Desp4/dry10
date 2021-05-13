@@ -7,7 +7,7 @@ descriptor_pool::descriptor_pool(std::span<const VkDescriptorPoolSize> pool_size
     VkDescriptorPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.maxSets = capacity;
-    pool_info.poolSizeCount = pool_sizes.size();
+    pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
     pool_info.pPoolSizes = pool_sizes.data();
     vkCreateDescriptorPool(device_main::device(), &pool_info, NULL_ALLOC, &_pool);
 }

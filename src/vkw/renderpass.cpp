@@ -136,7 +136,7 @@ void render_pass::start_cmd_pass(const cmd_buffer& buf, uint32_t frame_ind) cons
     pass_begin_info.renderPass = _pass;
     pass_begin_info.framebuffer = _framebuffers[frame_ind].buffer();
     pass_begin_info.renderArea = { {0, 0} , _extent };
-    pass_begin_info.clearValueCount = clear_values.size();
+    pass_begin_info.clearValueCount = static_cast<uint32_t>(clear_values.size());
     pass_begin_info.pClearValues = clear_values.data();
     vkCmdBeginRenderPass(buf.buffer(), &pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }

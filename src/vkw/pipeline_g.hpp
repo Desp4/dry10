@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dab/dabasset.hpp"
+#include "asset/vk_reflect.hpp"
 
 #include "renderpass.hpp"
 #include "shader/shader.hpp"
@@ -14,7 +14,7 @@ public:
     pipeline_graphics() = default;
     pipeline_graphics(pipeline_graphics&&) = default;
     pipeline_graphics(const render_pass& pass, VkExtent2D extent, std::span<const shader_module> modules,
-                      const dab::shader_vk_data& shader_data, std::span<const VkDescriptorSetLayout> layouts);
+                      const asset::vk_shader_data& shader_data, std::span<const VkDescriptorSetLayout> layouts);
     ~pipeline_graphics();
 
     void bind_pipeline(VkCommandBuffer buf) const;

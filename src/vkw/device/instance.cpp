@@ -13,7 +13,7 @@ instance::instance(std::span<const char* const> extensions, std::span<const char
     VkInstanceCreateInfo instance_info{};
     instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instance_info.pApplicationInfo = &app_info;
-    instance_info.enabledExtensionCount = extensions.size();
+    instance_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     instance_info.ppEnabledExtensionNames = extensions.data();
 
     VkDebugUtilsMessengerCreateInfoEXT debug_info{};
@@ -31,7 +31,7 @@ instance::instance(std::span<const char* const> extensions, std::span<const char
         debug_info.pfnUserCallback = callback;
 
         instance_info.pNext = &debug_info;
-        instance_info.enabledLayerCount = layers.size();
+        instance_info.enabledLayerCount = static_cast<uint32_t>(layers.size());
         instance_info.ppEnabledLayerNames = layers.data();
     }
 

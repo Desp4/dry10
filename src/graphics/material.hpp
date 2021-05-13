@@ -1,7 +1,6 @@
 #pragma once
 
-#include "asset/shaderasset.hpp"
-#include "asset/texasset.hpp"
+#include "asset/asset_src.hpp"
 
 namespace dry::gr {
 

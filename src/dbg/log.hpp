@@ -1,9 +1,14 @@
 #pragma once
 
+#ifndef DRY_LOG_H
+#define DRY_LOG_H
+
 #include <cassert>
 #include <cstdio>
+#include <string_view>
 
-#define PANIC assert(0)
+#include "util/num.hpp"
+// TODO : format and other C++20 features arrive - rewrite this
 
 #define LOG_ANY(lvl, fmt, ...) dry::dbg::log(lvl, __FILE__, __LINE__, fmt, __VA_ARGS__)
 
@@ -11,9 +16,6 @@
 #define LOG_DBG(fmt, ...) LOG_ANY(dry::dbg::log_level::debug,   fmt, __VA_ARGS__)
 #define LOG_WRN(fmt, ...) LOG_ANY(dry::dbg::log_level::warning, fmt, __VA_ARGS__)
 #define LOG_ERR(fmt, ...) LOG_ANY(dry::dbg::log_level::error,   fmt, __VA_ARGS__)
-
-#define PANIC_ASSERT(cond, fmt, ...) if (!(cond)) { LOG_ERR(fmt, __VA_ARGS__); PANIC; }
-#define WRN_ASSERT(cond, fmt, ...) if (!(cond)) { LOG_WRN(fmt, __VA_ARGS__); }
 
 namespace dry::dbg {
 
@@ -24,8 +26,17 @@ enum class log_level {
     error
 };
 
+[[noreturn]] inline void panic() {
+#ifdef DEBUG
+    assert(0);
+#else
+    std::terminate();
+#endif
+}
+
+// TODO : other than args everything else can be in a template, strings need some work tho
 template<typename... Args>
-void log(log_level lvl, const char* file, uint32_t line, const char* format, Args&&... args) {
+void log(log_level lvl, const char* file, u32_t line, const char* format, Args&&... args) {
     const char* lvl_str = "\0";
     switch (lvl) {
         case log_level::info:    lvl_str = "\033[32m[INF "; break; // green
@@ -51,3 +62,5 @@ void log(log_level lvl, const char* file, uint32_t line, const char* format, Arg
 }
 
 }
+
+#endif

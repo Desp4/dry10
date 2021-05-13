@@ -34,7 +34,7 @@ void descriptor_pool_pool::update_descriptor_set(VkDescriptorSet desc_set, std::
     for (auto& write : desc_writes) {
         write.dstSet = desc_set; // TODO : kinda dumb modifying the writes here, move it to descriptor?
     }
-    vkUpdateDescriptorSets(vkw::device_main::device(), desc_writes.size(), desc_writes.data(), 0, nullptr);
+    vkUpdateDescriptorSets(vkw::device_main::device(), static_cast<uint32_t>(desc_writes.size()), desc_writes.data(), 0, nullptr);
 }
 
 }

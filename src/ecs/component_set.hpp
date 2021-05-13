@@ -22,7 +22,7 @@ public:
         return bucket < _sparse_ent.size() && _sparse_ent[bucket] && _sparse_ent[bucket][bucket_offset(ent)] != null_entity;
     }
     void emplace(entity ent) {
-        secure_bucket(bucket_index(ent))[bucket_offset(ent)] = _dense_ent.size();
+        secure_bucket(bucket_index(ent))[bucket_offset(ent)] = static_cast<entity>(_dense_ent.size());
         _dense_ent.push_back(ent);
     }
     void remove(entity ent) {
@@ -39,7 +39,7 @@ public:
     }
 
     uint32_t size() const {
-        return _dense_ent.size();
+        return static_cast<uint32_t>(_dense_ent.size());
     }
 
     iterator begin() {
