@@ -1,13 +1,15 @@
 #include "image.hpp"
-#include "vkw/device/device.hpp"
+
+#include "vkw/device/g_device.hpp"
 
 namespace dry::vkw {
 
-image_base::image_base(VkExtent2D dimensions, uint32_t mip_lvls, VkSampleCountFlagBits samples, VkFormat img_format,
+vk_image::vk_image(
+    VkExtent2D dimensions, u32_t mip_lvls, VkSampleCountFlagBits samples, VkFormat img_format,
     VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties) :
-    _extent(dimensions),
-    _mip_levels(mip_lvls),
-    _format(img_format)
+    _extent{ dimensions },
+    _mip_levels{ mip_lvls },
+    _format{ img_format }
 {
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -24,19 +26,33 @@ image_base::image_base(VkExtent2D dimensions, uint32_t mip_lvls, VkSampleCountFl
     image_info.samples = samples;
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    vkCreateImage(device_main::device(), &image_info, NULL_ALLOC, &_image);
+    vkCreateImage(g_device->handle(), &image_info, null_alloc, &_image);
     VkMemoryRequirements mem_requirements{};
-    vkGetImageMemoryRequirements(device_main::device(), _image, &mem_requirements);
+    vkGetImageMemoryRequirements(g_device->handle(), _image, &mem_requirements);
 
-    _memory = device_memory(
+    _memory = vk_device_memory{
         mem_requirements.size,
-        device_main::find_memory_type_index(mem_requirements.memoryTypeBits, properties)
-    );
-    vkBindImageMemory(device_main::device(), _image, _memory.memory(), 0);
+        g_device->find_memory_type_index(mem_requirements.memoryTypeBits, properties)
+    };
+    vkBindImageMemory(g_device->handle(), _image, _memory.handle(), 0); // NOTE : no offset
 }
 
-image_base::~image_base() {
-    vkDestroyImage(device_main::device(), _image, NULL_ALLOC);
+vk_image::~vk_image() {
+    vkDestroyImage(g_device->handle(), _image, null_alloc);
+}
+
+vk_image& vk_image::operator=(vk_image&& oth) {
+    // destroy
+    vkDestroyImage(g_device->handle(), _image, null_alloc);
+    // move
+    _image = oth._image;
+    _memory = std::move(oth._memory);
+    _extent = oth._extent;
+    _mip_levels = oth._mip_levels;
+    _format = oth._format;
+    // null
+    oth._image = VK_NULL_HANDLE;
+    return *this;
 }
 
 }

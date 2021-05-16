@@ -1,25 +1,36 @@
 #pragma once
 
+#ifndef DRY_VK_QUEUE_TRANSFER_H
+#define DRY_VK_QUEUE_TRANSFER_H
+
 #include "queue.hpp"
 #include "vkw/buffer.hpp"
 #include "vkw/image/image.hpp"
 
 namespace dry::vkw {
 
-class queue_transfer : public queue_base {
+class vk_queue_transfer : public vk_queue {
 public:
-    using queue_base::queue_base;
+    using vk_queue::vk_queue;
 
-    buffer_base create_local_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data) const;
+    template<typename T>
+    vk_buffer create_local_buffer(const T& value, VkBufferUsageFlags usage) const { 
+        return create_local_buffer(&value, sizeof(T), usage);
+    }
+    template<typename T>
+    vk_buffer create_local_buffer(const std::vector<T>& values, VkBufferUsageFlags usage) const {
+        return create_local_buffer(values.data(), sizeof(T) * values.size(), usage);
+    }
+    template<typename T>
+    vk_buffer create_local_buffer(std::span<const T> values, VkBufferUsageFlags usage) const {
+        return create_local_buffer(values.data(), values.size_bytes(), usage);
+    }
+    vk_buffer create_local_buffer(const void* data, VkDeviceSize size, VkBufferUsageFlags usage) const;
 
     void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) const;
-    void copy_buffer_to_image(VkBuffer buffer, const image_base& image) const;
-
-    // NOTE: msvc doesn't recognize the assignment in base
-    queue_transfer& operator=(queue_transfer&& oth) {
-        queue_base::operator=(std::move(oth));
-        return *this;
-    }
+    void copy_buffer_to_image(VkBuffer buffer, const vk_image& image) const;
 };
 
 }
+
+#endif

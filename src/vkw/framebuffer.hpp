@@ -1,26 +1,28 @@
 #pragma once
 
-#include <span>
+#ifndef DRY_VK_FRAMEBUFFER_H
+#define DRY_VK_FRAMEBUFFER_H
 
 #include "vkw.hpp"
 
 namespace dry::vkw {
 
-class framebuffer : public movable<framebuffer> {
+class vk_framebuffer {
 public:
-    using movable<framebuffer>::operator=;
+    vk_framebuffer(VkRenderPass renderpass, std::span<const VkImageView> views, VkExtent2D extent);
 
-    framebuffer() = default;
-    framebuffer(framebuffer&&) = default;
-    framebuffer(VkRenderPass renderpass, std::span<const VkImageView> views, VkExtent2D extent);
-    ~framebuffer();
+    vk_framebuffer() = default;
+    vk_framebuffer(vk_framebuffer&& oth) { *this = std::move(oth); }
+    ~vk_framebuffer();
 
-    const VkFramebuffer& buffer() const {
-        return _framebuffer;
-    }
+    VkFramebuffer handle() const { return _framebuffer; }
+
+    vk_framebuffer& operator=(vk_framebuffer&&);
 
 private:
-    vk_handle<VkFramebuffer> _framebuffer;
+    VkFramebuffer _framebuffer = VK_NULL_HANDLE;
 };
 
 }
+
+#endif

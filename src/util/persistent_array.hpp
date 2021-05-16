@@ -11,9 +11,8 @@ using size_pt = uint32_t;
 static constexpr size_pt size_pt_null = std::numeric_limits<size_pt>::max();
 
 template<typename T>
-class persistent_array : public assignable<persistent_array<T>> {
+class persistent_array {
 public:
-    using assignable<persistent_array>::operator=;
     union union_t {
         ~union_t() = delete;
 

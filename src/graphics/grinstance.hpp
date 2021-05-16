@@ -13,6 +13,7 @@
 #include <array>
 
 #include "vkw/device/surface.hpp"
+#include "vkw/device/device.hpp"
 #include "vkw/queue/queue_graphics.hpp"
 #include "vkw/queue/queue_transfer.hpp"
 
@@ -30,10 +31,10 @@ public:
     constexpr static VkPresentModeKHR IMAGE_PRESENT_MODE = VK_PRESENT_MODE_MAILBOX_KHR;
 
     // NOTE : forcing default config, can't support fully custom features yet
-    graphics_instance(wsi::native_handle window);
+    graphics_instance(const wsi::window& window);
     ~graphics_instance();
 
-    const vkw::surface& surface() const {
+    const vkw::vk_surface& surface() const {
         return _surface;
     }
     const queue_ind_info& present_queue() const {
@@ -69,8 +70,9 @@ private:
         const VkDebugUtilsMessengerCallbackDataEXT* data,
         void* user_data);
 
-    vkw::instance _instance;
-    vkw::surface _surface;
+    vkw::vk_instance _instance;
+    vkw::vk_device _device;
+    vkw::vk_surface _surface;
 
     // family and index
     queue_ind_info _present_queue;

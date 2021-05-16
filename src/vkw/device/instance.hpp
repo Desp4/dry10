@@ -1,13 +1,13 @@
 #pragma once
 
-#include <vector>
-#include <span>
+#ifndef DRY_VK_INSTANCE_H
+#define DRY_VK_INSTANCE_H
 
 #include "vkw/vkw.hpp"
 
 namespace dry::vkw {
 
-class instance : public movable<instance> {
+class vk_instance {
 public:
     using debug_callback = VKAPI_ATTR VkBool32(VKAPI_CALL*)(
         VkDebugUtilsMessageSeverityFlagBitsEXT,
@@ -16,23 +16,28 @@ public:
         void*
     );
 
-    using movable<instance>::operator=;
+    // name can be null
+    vk_instance(std::span<const char* const> extensions, const char* name,
+        std::span<const char* const> layers, debug_callback callback
+    );
+    vk_instance(std::span<const char* const> extensions, const char* name) :
+        vk_instance{ extensions, name, std::span<const char* const>{}, nullptr } {}
 
-    instance() = default;
-    instance(instance&&) = default;
-    instance(std::span<const char* const> extensions, std::span<const char* const> layers,
-             debug_callback callback, const char* name = nullptr);
-    ~instance();
+    vk_instance() = default;
+    vk_instance(vk_instance&& oth) { *this = std::move(oth); }
+    ~vk_instance();
 
     std::vector<VkPhysicalDevice> enumerate_physical_devices() const;
 
-    const VkInstance& vk_instance() const {
-        return _instance;
-    }
+    VkInstance handle() const { return _instance; }
+
+    vk_instance& operator=(vk_instance&&);
 
 private:
-    vk_handle<VkInstance> _instance;
+    VkInstance _instance = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT _debugger = VK_NULL_HANDLE;
 };
 
 }
+
+#endif

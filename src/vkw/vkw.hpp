@@ -1,19 +1,19 @@
 #pragma once
 
+#ifndef DRY_VKW_H
+#define DRY_VKW_H
+
 #include <vulkan/vulkan.h>
 
 #include "util/util.hpp"
 
-#define NULL_ALLOC nullptr
-
 namespace dry::vkw {
 
-using util::movable;
-using util::nullable_ptr;
+constexpr VkAllocationCallbacks* null_alloc = nullptr;
 
 template<typename T>
-struct vk_handle : public util::nullable_base<T, static_cast<T>(VK_NULL_HANDLE)> {
-    using util::nullable_base<T, static_cast<T>(VK_NULL_HANDLE)>::nullable_base;
+struct vk_handle : nullable_primitive<T, static_cast<T>(VK_NULL_HANDLE)> {
+    using nullable_primitive<T, static_cast<T>(VK_NULL_HANDLE)>::nullable_primitive;
 
     vk_handle(const vk_handle&) = delete;
     vk_handle(vk_handle&&) = default;
@@ -23,3 +23,5 @@ struct vk_handle : public util::nullable_base<T, static_cast<T>(VK_NULL_HANDLE)>
 };
 
 }
+
+#endif

@@ -1,16 +1,10 @@
 #include "device.hpp"
-#include "dbg/log.hpp"
 
 namespace dry::vkw {
 
-void device_main::create(VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
+vk_device::vk_device(VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
     std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features)
 {
-    if (_destroyed && _device != VK_NULL_HANDLE) {
-        LOG_ERR("device should only be created once");
-        dbg::panic();
-    }
-
     _phys_device = phys_device;
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos(queue_infos.size());
 
@@ -26,37 +20,31 @@ void device_main::create(VkPhysicalDevice phys_device, std::span<const queue_inf
     VkDeviceCreateInfo device_info{};
     device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     device_info.pQueueCreateInfos = queue_create_infos.data();
-    device_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
+    device_info.queueCreateInfoCount = static_cast<u32_t>(queue_create_infos.size());
     device_info.pEnabledFeatures = &features;
     device_info.ppEnabledExtensionNames = extensions.data();
-    device_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+    device_info.enabledExtensionCount = static_cast<u32_t>(extensions.size());
     // layers deprecated, skipping
-    vkCreateDevice(_phys_device, &device_info, NULL_ALLOC, &_device);
+    vkCreateDevice(_phys_device, &device_info, null_alloc, &_device);
 }
 
-void device_main::destroy() {
-    if (_destroyed && _device == VK_NULL_HANDLE) {
-        LOG_ERR("device should only be destroyed once");
-        dbg::panic();
-    }
-    vkDestroyDevice(_device, NULL_ALLOC);
-
-    _destroyed = true;
+vk_device::~vk_device() {
+    vkDestroyDevice(_device, null_alloc);
 }
 
-VkSurfaceCapabilitiesKHR device_main::surface_capabilities(VkSurfaceKHR surface) {
+VkSurfaceCapabilitiesKHR vk_device::surface_capabilities(VkSurfaceKHR surface) const {
     VkSurfaceCapabilitiesKHR ret{};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_phys_device, surface, &ret);
     return ret;
 }
 
-VkPhysicalDeviceMemoryProperties device_main::memory_properties(){
+VkPhysicalDeviceMemoryProperties vk_device::memory_properties() const {
     VkPhysicalDeviceMemoryProperties mem_properties{};
     vkGetPhysicalDeviceMemoryProperties(_phys_device, &mem_properties);
     return mem_properties;
 }
 
-uint32_t device_main::find_memory_type_index(uint32_t type_filter, VkMemoryPropertyFlags properties) {
+u32_t vk_device::find_memory_type_index(u32_t type_filter, VkMemoryPropertyFlags properties) const {
     const auto mem_properties = memory_properties();
     for (auto i = 0u; i < mem_properties.memoryTypeCount; ++i) {
         if (type_filter & (1 << i) && properties ==
@@ -65,11 +53,22 @@ uint32_t device_main::find_memory_type_index(uint32_t type_filter, VkMemoryPrope
             return i;
         }
     }
-    return UINT32_MAX;
+    return (std::numeric_limits<u32_t>::max)();
 }
 
-void device_main::wait_on_device() {
+void vk_device::wait_on_device() const {
     vkDeviceWaitIdle(_device);
+}
+
+vk_device& vk_device::operator=(vk_device&& oth) {
+    // destroy
+    vkDestroyDevice(_device, null_alloc);
+    // move
+    _device = oth._device;
+    _phys_device = oth._phys_device;
+    // null
+    oth._device = VK_NULL_HANDLE;
+    return *this;
 }
 
 }

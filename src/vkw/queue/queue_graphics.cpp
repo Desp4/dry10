@@ -2,8 +2,8 @@
 
 namespace dry::vkw {
 
-void queue_graphics::transition_image_layout(const image_base& image, VkImageLayout layout_old, VkImageLayout layout_new) const {
-    cmd_buffer cmd_buf(&_pool);
+void vk_queue_graphics::transition_image_layout(const vk_image& image, VkImageLayout layout_old, VkImageLayout layout_new) const {
+    vk_cmd_buffer cmd_buf{ _pool };
     cmd_buf.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     VkPipelineStageFlags stage_src{}, stage_dst{};
@@ -14,7 +14,7 @@ void queue_graphics::transition_image_layout(const image_base& image, VkImageLay
     image_barrier.newLayout = layout_new;
     image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_barrier.image = image.image();
+    image_barrier.image = image.handle();
     image_barrier.subresourceRange.baseMipLevel = 0;
     image_barrier.subresourceRange.levelCount = image.mip_levels();
     image_barrier.subresourceRange.baseArrayLayer = 0;
@@ -47,17 +47,17 @@ void queue_graphics::transition_image_layout(const image_base& image, VkImageLay
     }
     // else bad, not supported
 
-    vkCmdPipelineBarrier(cmd_buf.buffer(), stage_src, stage_dst, 0, 0, nullptr, 0, nullptr, 1, &image_barrier);
-    submit_cmd(cmd_buf.buffer());
+    vkCmdPipelineBarrier(cmd_buf.handle(), stage_src, stage_dst, 0, 0, nullptr, 0, nullptr, 1, &image_barrier);
+    submit_cmd(cmd_buf.handle());
 }
 
-void queue_graphics::generate_mip_maps(const image_base& image) const {
-    cmd_buffer cmd_buf(&_pool);
+void vk_queue_graphics::generate_mip_maps(const vk_image& image) const {
+    vk_cmd_buffer cmd_buf{ _pool };
     cmd_buf.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.image = image.image();
+    barrier.image = image.handle();
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -65,7 +65,7 @@ void queue_graphics::generate_mip_maps(const image_base& image) const {
     barrier.subresourceRange.layerCount = 1;
     barrier.subresourceRange.levelCount = 1;
 
-    int32_t mipWidth = image.extent().width, mipHeight = image.extent().height;
+    i32_t mipWidth = image.extent().width, mipHeight = image.extent().height;
     for (auto i = 1u; i < image.mip_levels(); ++i) {
         barrier.subresourceRange.baseMipLevel = i - 1;
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -73,7 +73,7 @@ void queue_graphics::generate_mip_maps(const image_base& image) const {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-        vkCmdPipelineBarrier(cmd_buf.buffer(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        vkCmdPipelineBarrier(cmd_buf.handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
             0, 0, nullptr, 0, nullptr, 1, &barrier
         );
 
@@ -90,9 +90,9 @@ void queue_graphics::generate_mip_maps(const image_base& image) const {
         blit.dstSubresource.mipLevel = i;
         blit.dstSubresource.baseArrayLayer = 0;
         blit.dstSubresource.layerCount = 1;
-        vkCmdBlitImage(cmd_buf.buffer(),
-            image.image(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            image.image(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        vkCmdBlitImage(cmd_buf.handle(),
+            image.handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            image.handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             1, &blit, VK_FILTER_LINEAR
         );
 
@@ -101,7 +101,8 @@ void queue_graphics::generate_mip_maps(const image_base& image) const {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(cmd_buf.buffer(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+        vkCmdPipelineBarrier(cmd_buf.handle(),
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
             0, nullptr, 0, nullptr, 1, &barrier
         );
 
@@ -120,10 +121,12 @@ void queue_graphics::generate_mip_maps(const image_base& image) const {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    vkCmdPipelineBarrier(cmd_buf.buffer(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+    vkCmdPipelineBarrier(cmd_buf.handle(),
+        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
         0, 0, nullptr, 0, nullptr, 1, &barrier
     );
-    submit_cmd(cmd_buf.buffer());
+    submit_cmd(cmd_buf.handle());
 }
 
 }
+

@@ -1,6 +1,7 @@
 #pragma once
 
-#include <vector>
+#ifndef DRY_VK_RENDERPASS_H
+#define DRY_VK_RENDERPASS_H
 
 #include "image/imageviewpair.hpp"
 #include "framebuffer.hpp"
@@ -8,50 +9,48 @@
 
 namespace dry::vkw {
 
-enum class render_pass_flags : uint32_t {
-    color = 0x1,
-    depth = 0x2,
-    msaa  = 0x4
-};
+using render_pass_flag = u8_t;
+namespace render_pass_flags {
 
-consteval bool enable_flags(render_pass_flags) {
-    return true;
+constexpr render_pass_flag color = 0x1;
+constexpr render_pass_flag depth = 0x2;
+constexpr render_pass_flag msaa = 0x4;
+
 }
 
-class render_pass : public movable<render_pass> {
+class vk_render_pass {
 public:
-    using movable<render_pass>::operator=;
+    vk_render_pass(
+        VkExtent2D extent, render_pass_flag flags, VkSampleCountFlagBits samples,
+        VkFormat image_format, VkFormat depth_format
+    );
 
-    render_pass() = default;
-    render_pass(render_pass&&) = default;
-    render_pass(VkExtent2D extent, render_pass_flags flags, VkSampleCountFlagBits samples,
-                VkFormat image_format, VkFormat depth_format);
-    ~render_pass();
+    vk_render_pass() = default;
+    vk_render_pass(vk_render_pass&& oth) { *this = std::move(oth); }
+    ~vk_render_pass();
 
-    void create_framebuffers(std::span<const image_view> swap_views);
-    void start_cmd_pass(const cmd_buffer& buf, uint32_t frame_ind) const;
+    void create_framebuffers(std::span<const vk_image_view> swap_views);
+    void start_cmd_pass(const vk_cmd_buffer& buf, u32_t frame_ind) const;
 
-    const VkRenderPass& pass() const {
-        return _pass;
-    }
-    VkSampleCountFlagBits raster_sample_count() const {
-        return _samples;
-    }
-    VkBool32 depth_enabled() const {
-        return _depth_enabled;
-    }
+    VkRenderPass handle() const { return _pass; }
+    VkSampleCountFlagBits raster_sample_count() const { return _samples; }
+    bool depth_enabled() const { return _depth_enabled; }
+
+    vk_render_pass& operator=(vk_render_pass&&);
 
 private:
-    vk_handle<VkRenderPass> _pass;
+    VkRenderPass _pass = VK_NULL_HANDLE;
+
+    vk_image_view_pair _depth_image;
+    vk_image_view_pair _color_image;
+
+    std::vector<vk_framebuffer> _framebuffers;
 
     VkExtent2D _extent;
-    VkBool32 _depth_enabled;
     VkSampleCountFlagBits _samples;
-
-    image_view_pair _depth_image;
-    image_view_pair _color_image;
-
-    std::vector<framebuffer> _framebuffers;
+    bool _depth_enabled;
 };
 
 }
+
+#endif

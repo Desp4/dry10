@@ -1,22 +1,33 @@
-#ifdef _WIN32
- #define GLFW_EXPOSE_NATIVE_WIN32
-#endif
-
 #include "window.hpp"
-
-#include <GLFW/glfw3native.h>
 
 namespace dry::wsi {
 
-window::window(uint32_t width, uint32_t height) {
+// dummy call on every window creation, not a big deal
+void init_glfw() {
+    struct glfw_dummy {
+        glfw_dummy() {
+            glfwInit();
+        }
+        ~glfw_dummy() {
+            glfwTerminate();
+        }
+    };
+    const static glfw_dummy dummy{};
+}
+
+window::window() {
+    init_glfw();
+}
+
+window::window(u32_t width, u32_t height, std::string_view title) : window{} {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-    _window = glfwCreateWindow(width, height, "dry1", nullptr, nullptr);
+    _window = glfwCreateWindow(width, height, title.data(), nullptr, nullptr);
 }
 
 window::~window() {
-    glfwDestroyWindow(_window);
+    glfwDestroyWindow(_window); // null is checked inside, ok
 }
 
 bool window::should_close() const {
@@ -27,12 +38,18 @@ void window::poll_events() const {
     glfwPollEvents();
 }
 
-native_handle window::window_handle() const {
-    return glfwGetWin32Window(_window);
+void window::set_title(std::string_view title) {
+    glfwSetWindowTitle(_window, title.data());
 }
 
-void window::set_title(const std::string& title) {
-    glfwSetWindowTitle(_window, title.c_str());
+window& window::operator=(window&& oth) {
+    // destroy
+    glfwDestroyWindow(_window);
+    // move
+    _window = oth._window;
+    // null
+    oth._window = nullptr;
+    return *this;
 }
 
 }

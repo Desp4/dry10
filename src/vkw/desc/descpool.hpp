@@ -1,25 +1,28 @@
 #pragma once
 
-#include <vector>
-#include <span>
+#ifndef DRY_VK_DESCPOOL_H
+#define DRY_VK_DESCPOOL_H
 
 #include "vkw/vkw.hpp"
 
 namespace dry::vkw {
 
-class descriptor_pool : public movable<descriptor_pool> {
+class vk_descriptor_pool {
 public:
-    using movable<descriptor_pool>::operator=;
+    vk_descriptor_pool(std::span<const VkDescriptorPoolSize> pool_sizes, u32_t capacity);
 
-    descriptor_pool() = default;
-    descriptor_pool(descriptor_pool&&) = default;
-    descriptor_pool(std::span<const VkDescriptorPoolSize> pool_sizes, uint32_t capacity);
-    ~descriptor_pool();
+    vk_descriptor_pool() = default;
+    vk_descriptor_pool(vk_descriptor_pool&& oth) { *this = std::move(oth); }
+    ~vk_descriptor_pool();
 
-    void create_sets(VkDescriptorSet* beg, VkDescriptorSetLayout layout, uint32_t count) const;
+    void create_sets(std::span<VkDescriptorSet> sets, VkDescriptorSetLayout layout) const;
+
+    vk_descriptor_pool& operator=(vk_descriptor_pool&&);
 
 private:
-    vk_handle<VkDescriptorPool> _pool;
+    VkDescriptorPool _pool = VK_NULL_HANDLE;
 };
 
 }
+
+#endif

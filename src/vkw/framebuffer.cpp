@@ -1,9 +1,10 @@
 #include "framebuffer.hpp"
-#include "device/device.hpp"
+
+#include "device/g_device.hpp"
 
 namespace dry::vkw {
 
-framebuffer::framebuffer(VkRenderPass renderPass, std::span<const VkImageView> views, VkExtent2D extent) {
+vk_framebuffer::vk_framebuffer(VkRenderPass renderPass, std::span<const VkImageView> views, VkExtent2D extent) {
     VkFramebufferCreateInfo framebuf_info{};
     framebuf_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebuf_info.renderPass = renderPass;
@@ -12,11 +13,21 @@ framebuffer::framebuffer(VkRenderPass renderPass, std::span<const VkImageView> v
     framebuf_info.width = extent.width;
     framebuf_info.height = extent.height;
     framebuf_info.layers = 1;
-    vkCreateFramebuffer(device_main::device(), &framebuf_info, NULL_ALLOC, &_framebuffer);
+    vkCreateFramebuffer(g_device->handle(), &framebuf_info, null_alloc, &_framebuffer);
 }
 
-framebuffer::~framebuffer() {
-    vkDestroyFramebuffer(device_main::device(), _framebuffer, NULL_ALLOC);
+vk_framebuffer::~vk_framebuffer() {
+    vkDestroyFramebuffer(g_device->handle(), _framebuffer, null_alloc);
+}
+
+vk_framebuffer& vk_framebuffer::operator=(vk_framebuffer&& oth) {
+    // destroy
+    vkDestroyFramebuffer(g_device->handle(), _framebuffer, null_alloc);
+    // move
+    _framebuffer = oth._framebuffer;
+    // null
+    oth._framebuffer = VK_NULL_HANDLE;
+    return *this;
 }
 
 }

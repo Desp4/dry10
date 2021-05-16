@@ -10,10 +10,10 @@ resource_manager::resource_manager(const graphics_instance& instance) :
     _ubos(_renderer.image_count())
 {
     queue_ind_info queue_data = instance.graphics_queue();
-    _graphics_queue = vkw::queue_graphics(queue_data.family_ind, queue_data.queue_ind);
+    _graphics_queue = vkw::vk_queue_graphics(queue_data.family_ind, queue_data.queue_ind);
 
     queue_data = instance.transfer_queue();
-    _transfer_queue = vkw::queue_transfer(queue_data.family_ind, queue_data.queue_ind);
+    _transfer_queue = vkw::vk_queue_transfer(queue_data.family_ind, queue_data.queue_ind);
 }
 
 renderable resource_manager::create_renderable(const material& mat, const asset::mesh_asset& mesh) {
@@ -36,10 +36,10 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
         LOG_DBG("shader[hash 0x%08x] not registered, creating a pipeline", mat.shader->hash);
 
         struct pipeline_group new_pipeline;
-        new_pipeline.layout = vkw::descriptor_layout(vk_data.layout_bindings);
+        new_pipeline.layout = vkw::vk_descriptor_layout(vk_data.layout_bindings);
         new_pipeline.true_size = 1;
         new_pipeline.pipeline = _renderer.create_pipeline(mat, new_pipeline.layout);
-        new_pipeline.textured_desc_pool = descriptor_pool_pool{ POOL_SIZES, POOL_CAPACITY, new_pipeline.layout.layout() };
+        new_pipeline.textured_desc_pool = descriptor_pool_pool{ POOL_SIZES, POOL_CAPACITY, new_pipeline.layout.handle() };
 
         curr_pipeline = &_pipeline_groups.emplace(mat.shader->hash, std::move(new_pipeline)).first->second;
     }
@@ -56,14 +56,12 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
 
         mesh_data new_mesh;
         new_mesh.index_buffer = _transfer_queue.create_local_buffer(
-            mesh.indices.size() * sizeof(decltype(mesh.indices)::value_type),
-            VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-            mesh.indices.data()
+            mesh.indices,
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT
         );
         new_mesh.vertex_buffer = _transfer_queue.create_local_buffer(
-            mesh.vertices.size() * sizeof(decltype(mesh.vertices)::value_type),
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            mesh.vertices.data()
+            mesh.vertices,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
         );
 
         _mesh_buffers.emplace(mesh.hash, refcounted_t<mesh_data>{std::move(new_mesh), 1});
@@ -90,7 +88,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
             combined_sampler_data new_comb_sampler;
             const uint32_t mip_levels = static_cast<uint32_t>(std::log2((std::max)(texture->width, texture->height)));
 
-            vkw::buffer_base staging_buffer(
+            vkw::vk_buffer staging_buffer(
                 texture->width * texture->height * texture->channels, // NOTE : assuming 8bit color
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
@@ -98,7 +96,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
             staging_buffer.write(texture->pixel_data.data(), texture->pixel_data.size());
 
             // NOTE : some hardcode on the usage too
-            new_comb_sampler.texture = vkw::image_view_pair(
+            new_comb_sampler.texture = vkw::vk_image_view_pair(
                 VkExtent2D{ texture->width, texture->height },
                 mip_levels,
                 VK_SAMPLE_COUNT_1_BIT,
@@ -112,10 +110,10 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
             _graphics_queue.transition_image_layout(new_comb_sampler.texture.image(),
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
             );
-            _transfer_queue.copy_buffer_to_image(staging_buffer.buffer(), new_comb_sampler.texture.image());
+            _transfer_queue.copy_buffer_to_image(staging_buffer.handle(), new_comb_sampler.texture.image());
             _graphics_queue.generate_mip_maps(new_comb_sampler.texture.image());
 
-            new_comb_sampler.sampler = vkw::tex_sampler(mip_levels);
+            new_comb_sampler.sampler = vkw::vk_tex_sampler(mip_levels);
             _combined_samplers.emplace(texture->hash, refcounted_t<combined_sampler_data>{std::move(new_comb_sampler), 1});
         }
         else {
@@ -165,8 +163,8 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
         VkDescriptorImageInfo& img_info = vk_data.comb_sampler_infos[i].info;
         const combined_sampler_data& sampler_data = _combined_samplers[new_renderable.sampler_ids[i]].value;
 
-        img_info.imageView = sampler_data.texture.view().view();
-        img_info.sampler = sampler_data.sampler.sampler();
+        img_info.imageView = sampler_data.texture.view().handle();
+        img_info.sampler = sampler_data.sampler.handle();
         img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         desc_writes[vk_data.comb_sampler_infos[i].binding_ind].pImageInfo = &img_info;
@@ -177,7 +175,7 @@ renderable resource_manager::create_renderable(const material& mat, const asset:
         // needed only for types that have frame dependent data, for now only ubos
         for (auto j = 0u; j < vk_data.buffer_infos.size(); ++j) {
             VkDescriptorBufferInfo& buf_info = vk_data.buffer_infos[j].info;
-            buf_info.buffer = _ubos[i][new_renderable.ubo_ids[j]].buffer();
+            buf_info.buffer = _ubos[i][new_renderable.ubo_ids[j]].handle();
 
             desc_writes[vk_data.buffer_infos[j].binding_ind].pBufferInfo = &buf_info;
         }
@@ -275,7 +273,7 @@ void resource_manager::advance_frame() {
 
 void resource_manager::submit_frame() {
     VkDeviceSize offsets[1]{ 0 };
-    const VkCommandBuffer& cmd_buf = _frame_ctx.cmd_buf->buffer();
+    const VkCommandBuffer& cmd_buf = _frame_ctx.cmd_buf->handle();
 
     for (const auto& pipeline_pair : _pipeline_groups) {
         const pipeline_group& pipeline_group = pipeline_pair.second;
@@ -284,8 +282,9 @@ void resource_manager::submit_frame() {
         for (const persistent_recording_data& record_data : pipeline_group.recording_data) {
             const mesh_data& record_mesh = _mesh_buffers[record_data.mesh_id].value;
 
-            vkCmdBindVertexBuffers(cmd_buf, 0, 1, &record_mesh.vertex_buffer.buffer(), offsets);
-            vkCmdBindIndexBuffer(cmd_buf, record_mesh.index_buffer.buffer(), 0, VK_INDEX_TYPE_UINT32);
+            auto vert_buffer = record_mesh.vertex_buffer.handle();
+            vkCmdBindVertexBuffers(cmd_buf, 0, 1, &vert_buffer, offsets);
+            vkCmdBindIndexBuffer(cmd_buf, record_mesh.index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
             pipeline_group.pipeline.bind_descriptor_sets(
                 cmd_buf, std::span{ record_data.descriptor_sets.data() + _frame_ctx.frame_index, 1 }
             );

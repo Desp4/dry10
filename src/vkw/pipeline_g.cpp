@@ -1,9 +1,11 @@
 #include "pipeline_g.hpp"
-#include "device/device.hpp"
+
+#include "device/g_device.hpp"
 
 namespace dry::vkw {
 
-pipeline_graphics::pipeline_graphics(const render_pass& pass, VkExtent2D extent, std::span<const shader_module> modules,
+vk_pipeline_graphics::vk_pipeline_graphics(
+    const vk_render_pass& pass, VkExtent2D extent, std::span<const vk_shader_module> modules,
     const asset::vk_shader_data& shader_data, std::span<const VkDescriptorSetLayout> layouts)
 {
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
@@ -13,8 +15,8 @@ pipeline_graphics::pipeline_graphics(const render_pass& pass, VkExtent2D extent,
         shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         shader_stage.pNext = nullptr;
         shader_stage.flags = 0;
-        shader_stage.stage = static_cast<VkShaderStageFlagBits>(sh_module.type());
-        shader_stage.module = sh_module.sh_module();
+        shader_stage.stage = sh_module.type();
+        shader_stage.module = sh_module.handle();
         shader_stage.pName = "main";
         shader_stage.pSpecializationInfo = nullptr;
 
@@ -25,7 +27,7 @@ pipeline_graphics::pipeline_graphics(const render_pass& pass, VkExtent2D extent,
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input_info.vertexBindingDescriptionCount = 1;
     vertex_input_info.pVertexBindingDescriptions = &shader_data.vertex_binding;
-    vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(shader_data.vertex_descriptors.size());
+    vertex_input_info.vertexAttributeDescriptionCount = static_cast<u32_t>(shader_data.vertex_descriptors.size());
     vertex_input_info.pVertexAttributeDescriptions = shader_data.vertex_descriptors.data();
 
     VkPipelineInputAssemblyStateCreateInfo assembly_info{};
@@ -112,14 +114,14 @@ pipeline_graphics::pipeline_graphics(const render_pass& pass, VkExtent2D extent,
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(layouts.size());
+    pipeline_layout_info.setLayoutCount = static_cast<u32_t>(layouts.size());
     pipeline_layout_info.pSetLayouts = layouts.data();
     pipeline_layout_info.pushConstantRangeCount = 0;
-    vkCreatePipelineLayout(device_main::device(), &pipeline_layout_info, NULL_ALLOC, &_pipeline_layout);
+    vkCreatePipelineLayout(g_device->handle(), &pipeline_layout_info, null_alloc, &_pipeline_layout);
 
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipeline_info.stageCount = static_cast<uint32_t>(shader_stages.size());
+    pipeline_info.stageCount = static_cast<u32_t>(shader_stages.size());
     pipeline_info.pStages = shader_stages.data();
     pipeline_info.pVertexInputState = &vertex_input_info;
     pipeline_info.pInputAssemblyState = &assembly_info;
@@ -131,29 +133,41 @@ pipeline_graphics::pipeline_graphics(const render_pass& pass, VkExtent2D extent,
     pipeline_info.pColorBlendState = &blend_info;
     pipeline_info.pDynamicState = nullptr;
     pipeline_info.layout = _pipeline_layout;
-    pipeline_info.renderPass = pass.pass();
+    pipeline_info.renderPass = pass.handle();
     pipeline_info.subpass = 0;
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE; // assume no recreation
     pipeline_info.basePipelineIndex = -1;
 
-    vkCreateGraphicsPipelines(device_main::device(), VK_NULL_HANDLE, 1, &pipeline_info, NULL_ALLOC, &_pipeline);
+    vkCreateGraphicsPipelines(g_device->handle(), VK_NULL_HANDLE, 1, &pipeline_info, null_alloc, &_pipeline);
 }
 
-pipeline_graphics::~pipeline_graphics() {
-    vkDestroyPipeline(device_main::device(), _pipeline, NULL_ALLOC);
-    vkDestroyPipelineLayout(device_main::device(), _pipeline_layout, NULL_ALLOC);
+vk_pipeline_graphics::~vk_pipeline_graphics() {
+    vkDestroyPipeline(g_device->handle(), _pipeline, null_alloc);
+    vkDestroyPipelineLayout(g_device->handle(), _pipeline_layout, null_alloc);
 }
 
-void pipeline_graphics::bind_pipeline(VkCommandBuffer buf) const {
+void vk_pipeline_graphics::bind_pipeline(VkCommandBuffer buf) const {
     vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline);
 }
 
-void pipeline_graphics::bind_descriptor_sets(VkCommandBuffer buf, std::span<const VkDescriptorSet> sets) const
-{
+void vk_pipeline_graphics::bind_descriptor_sets(VkCommandBuffer buf, std::span<const VkDescriptorSet> sets) const {
     vkCmdBindDescriptorSets(
         buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline_layout,
-        0, static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr
+        0, static_cast<u32_t>(sets.size()), sets.data(), 0, nullptr
     );
+}
+
+vk_pipeline_graphics& vk_pipeline_graphics::operator=(vk_pipeline_graphics&& oth) {
+    // destroy
+    vkDestroyPipeline(g_device->handle(), _pipeline, null_alloc);
+    vkDestroyPipelineLayout(g_device->handle(), _pipeline_layout, null_alloc);
+    // move
+    _pipeline = oth._pipeline;
+    _pipeline_layout = oth._pipeline_layout;
+    // null
+    oth._pipeline = VK_NULL_HANDLE;
+    oth._pipeline_layout = VK_NULL_HANDLE;
+    return *this;
 }
 
 }

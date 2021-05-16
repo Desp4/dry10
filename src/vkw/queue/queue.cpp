@@ -1,15 +1,16 @@
 #include "queue.hpp"
-#include "vkw/device/device.hpp"
+
+#include "vkw/device/g_device.hpp"
 
 namespace dry::vkw {
 
-queue_base::queue_base(uint32_t queue_family_index, uint32_t queue_index) :
-    _pool(queue_family_index)
+vk_queue::vk_queue(u32_t queue_family_index, u32_t queue_index) :
+    _pool{ queue_family_index }
 {
-    vkGetDeviceQueue(device_main::device(), queue_family_index, queue_index, &_queue);
+    vkGetDeviceQueue(g_device->handle(), queue_family_index, queue_index, &_queue);
 }
 
-void queue_base::submit_cmd(VkCommandBuffer cmd_buf) const {
+void vk_queue::submit_cmd(VkCommandBuffer cmd_buf) const {
     vkEndCommandBuffer(cmd_buf);
 
     VkSubmitInfo submit_info{};
@@ -19,6 +20,17 @@ void queue_base::submit_cmd(VkCommandBuffer cmd_buf) const {
 
     vkQueueSubmit(_queue, 1, &submit_info, VK_NULL_HANDLE);
     vkQueueWaitIdle(_queue); // NOTE : waiting here, perhaps not needed in some cases
+}
+
+vk_queue& vk_queue::operator=(vk_queue&& oth) {
+    // delete
+    // don't need to
+    // move
+    _queue = oth._queue;
+    _pool = std::move(oth._pool);
+    // null
+    oth._queue = VK_NULL_HANDLE; // doing it just for consistentcy, cleaner errors
+    return *this;
 }
 
 }

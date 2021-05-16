@@ -3,27 +3,32 @@
 #endif
 
 #include "surface.hpp"
-#include "instance.hpp"
 
 namespace dry::vkw {
 
-surface::surface(const instance* inst, wsi::native_handle handle) :
-    _instance(inst)
+vk_surface::vk_surface(const vk_instance& instance, const wsi::window& window) :
+    _instance(&instance)
 {
-#ifdef _WIN32
-    VkWin32SurfaceCreateInfoKHR surface_info{};
-    surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-    surface_info.hinstance = GetModuleHandle(nullptr);
-    surface_info.hwnd = static_cast<HWND>(handle);
-
-    vkCreateWin32SurfaceKHR(_instance->vk_instance(), &surface_info, NULL_ALLOC, &_surface);
-#endif
+    glfwCreateWindowSurface(instance.handle(), window.handle(), null_alloc, &_surface);
 }
 
-surface::~surface() {
+vk_surface::~vk_surface() {
     if (_instance) {
-        vkDestroySurfaceKHR(_instance->vk_instance(), _surface, NULL_ALLOC);
+        vkDestroySurfaceKHR(_instance->handle(), _surface, null_alloc);
     }   
+}
+
+vk_surface& vk_surface::operator=(vk_surface&& oth) {
+    // destroy
+    if (_instance) {
+        vkDestroySurfaceKHR(_instance->handle(), _surface, null_alloc);
+    }
+    // move
+    _instance = oth._instance;
+    _surface = oth._surface;
+    // null
+    oth._instance = nullptr;
+    return *this;
 }
 
 }

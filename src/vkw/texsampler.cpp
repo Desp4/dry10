@@ -1,9 +1,10 @@
 #include "texsampler.hpp"
-#include "device/device.hpp"
+
+#include "device/g_device.hpp"
 
 namespace dry::vkw {
 
-tex_sampler::tex_sampler(uint32_t mip_levels) {
+vk_tex_sampler::vk_tex_sampler(uint32_t mip_levels) {
     // NOTE : some hardcoded values here
     VkSamplerCreateInfo sampler_info{};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -21,12 +22,22 @@ tex_sampler::tex_sampler(uint32_t mip_levels) {
     sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     sampler_info.mipLodBias = 0.0f;
     sampler_info.minLod = 0.0f;
-    sampler_info.maxLod = static_cast<float>(mip_levels); // NOTE : remind me?
-    vkCreateSampler(device_main::device(), &sampler_info, NULL_ALLOC, &_sampler);
+    sampler_info.maxLod = static_cast<f32_t>(mip_levels); // NOTE : remind me?
+    vkCreateSampler(g_device->handle(), &sampler_info, null_alloc, &_sampler);
 }
 
-tex_sampler::~tex_sampler() {
-    vkDestroySampler(device_main::device(), _sampler, NULL_ALLOC);
+vk_tex_sampler::~vk_tex_sampler() {
+    vkDestroySampler(g_device->handle(), _sampler, null_alloc);
+}
+
+vk_tex_sampler& vk_tex_sampler::operator=(vk_tex_sampler&& oth) {
+    // destroy
+    vkDestroySampler(g_device->handle(), _sampler, null_alloc);
+    // move
+    _sampler = oth._sampler;
+    // null
+    oth._sampler = VK_NULL_HANDLE;
+    return *this;
 }
 
 }

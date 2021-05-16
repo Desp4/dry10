@@ -1,26 +1,28 @@
 #pragma once
 
-#include <span>
+#ifndef DRY_VK_DESCLAYOUT_H
+#define DRY_VK_DESCLAYOUT_H
 
 #include "vkw/vkw.hpp"
 
 namespace dry::vkw {
 
-class descriptor_layout : public movable<descriptor_layout> {
+class vk_descriptor_layout {
 public:
-    using movable<descriptor_layout>::operator=;
+    vk_descriptor_layout(std::span<const VkDescriptorSetLayoutBinding> bindings);
 
-    descriptor_layout() = default;
-    descriptor_layout(descriptor_layout&&) = default;
-    descriptor_layout(std::span<const VkDescriptorSetLayoutBinding> bindings);
-    ~descriptor_layout();
+    vk_descriptor_layout() = default;
+    vk_descriptor_layout(vk_descriptor_layout&& oth) { *this = std::move(oth); }
+    ~vk_descriptor_layout();
 
-    const VkDescriptorSetLayout& layout() const {
-        return _descriptor_set_layout;
-    }
+    VkDescriptorSetLayout handle() const { return _descriptor_set_layout; }
+
+    vk_descriptor_layout& operator=(vk_descriptor_layout&&);
 
 private:
-    vk_handle<VkDescriptorSetLayout> _descriptor_set_layout;
+    VkDescriptorSetLayout _descriptor_set_layout = VK_NULL_HANDLE;
 };
 
 }
+
+#endif

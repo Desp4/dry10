@@ -83,9 +83,7 @@ private:
     };
 };
 
-int main()
-{
-    dry::wsi::gldw_dummy glfw_dummy;
+int main() {
     sandbox_program program;
 
     program.begin_render();

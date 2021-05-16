@@ -1,40 +1,37 @@
 #pragma once
 
-#include <string>
+#ifndef DRY_WINDOW_H
+#define DRY_WINDOW_H
+
+#include <string_view>
 
 #include <GLFW/glfw3.h>
 
-#include "util/util.hpp"
+#include "util/num.hpp"
 
 namespace dry::wsi {
 
-struct gldw_dummy {
-    gldw_dummy() {
-        glfwInit();
-    }
-    ~gldw_dummy() {
-        glfwTerminate();
-    }
-};
-
-// opaque to not include win32 here
-using native_handle = void*;
-
-class window : public util::movable<window> {
+class window {
 public:
-    using util::movable<window>::operator=;
+    window(u32_t width, u32_t height) : window{ width, height, "dry1 instance" } {}
+    window(u32_t width, u32_t height, std::string_view title);
 
-    window() = default;
-    window(uint32_t width, uint32_t height);
+    window();
+    window(window&& oth) { *this = std::move(oth); }
     ~window();
 
     bool should_close() const;
     void poll_events() const;
-    native_handle window_handle() const;
-    void set_title(const std::string& title);
+    void set_title(std::string_view title);
+
+    GLFWwindow* handle() const { return _window; }
+
+    window& operator=(window&&);
 
 private:
-    util::nullable_ptr<GLFWwindow> _window;
+    GLFWwindow* _window = nullptr;
 };
 
 }
+
+#endif

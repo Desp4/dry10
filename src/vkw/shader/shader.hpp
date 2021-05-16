@@ -1,37 +1,30 @@
 #pragma once
 
-#include <span>
+#ifndef DRY_VK_SHADER_H
+#define DRY_VK_SHADER_H
 
 #include "vkw/vkw.hpp"
 
 namespace dry::vkw {
 
-enum class shader_type : uint32_t {
-    vertex   = VK_SHADER_STAGE_VERTEX_BIT,
-    geometry = VK_SHADER_STAGE_GEOMETRY_BIT,
-    fragment = VK_SHADER_STAGE_FRAGMENT_BIT,
-    compute  = VK_SHADER_STAGE_COMPUTE_BIT
-};
-
-class shader_module : public movable<shader_module> {
+class vk_shader_module {
 public:
-    using movable<shader_module>::operator=;
+    vk_shader_module(const_byte_span bin, VkShaderStageFlagBits type);
 
-    shader_module() = default;
-    shader_module(shader_module&&) = default;
-    shader_module(std::span<const std::byte> bin, shader_type type);
-    ~shader_module();
+    vk_shader_module() = default;
+    vk_shader_module(vk_shader_module&& oth) { *this = std::move(oth); }
+    ~vk_shader_module();
 
-    const VkShaderModule& sh_module() const {
-        return _module;
-    }
-    const shader_type& type() const {
-        return _type;
-    }
+    VkShaderModule handle() const { return _module; }
+    VkShaderStageFlagBits type() const { return _type; }
+
+    vk_shader_module& operator=(vk_shader_module&&);
 
 private:
-    vk_handle<VkShaderModule> _module;
-    shader_type _type;
+    VkShaderModule _module = VK_NULL_HANDLE;
+    VkShaderStageFlagBits _type;
 };
 
 }
+
+#endif

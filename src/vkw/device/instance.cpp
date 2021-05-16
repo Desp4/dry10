@@ -3,7 +3,9 @@
 
 namespace dry::vkw {
 
-instance::instance(std::span<const char* const> extensions, std::span<const char* const> layers, debug_callback callback, const char* name) {
+vk_instance::vk_instance(std::span<const char* const> extensions, const char* name,
+    std::span<const char* const> layers, debug_callback callback)
+{
     VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.apiVersion = VK_API_VERSION_1_2;
@@ -13,11 +15,12 @@ instance::instance(std::span<const char* const> extensions, std::span<const char
     VkInstanceCreateInfo instance_info{};
     instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instance_info.pApplicationInfo = &app_info;
-    instance_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+    instance_info.enabledExtensionCount = static_cast<u32_t>(extensions.size());
     instance_info.ppEnabledExtensionNames = extensions.data();
 
     VkDebugUtilsMessengerCreateInfoEXT debug_info{};
     const bool is_debug = layers.size() > 0 && callback;
+    // TODO : debug settings not customizable
     if (is_debug) {
         debug_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         debug_info.messageSeverity =
@@ -35,7 +38,7 @@ instance::instance(std::span<const char* const> extensions, std::span<const char
         instance_info.ppEnabledLayerNames = layers.data();
     }
 
-    vkCreateInstance(&instance_info, NULL_ALLOC, &_instance);
+    vkCreateInstance(&instance_info, null_alloc, &_instance);
     LOG_DBG(
         "vulkan instance for dry1 created\n\tapplication name: %s\n\tapi version: %i.%i.%i\n\tvalidation layers: %s",
         name,
@@ -46,24 +49,41 @@ instance::instance(std::span<const char* const> extensions, std::span<const char
     if (is_debug) {
         const auto create_debugger = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
             vkGetInstanceProcAddr(_instance, "vkCreateDebugUtilsMessengerEXT"));
-        create_debugger(_instance, &debug_info, NULL_ALLOC, &_debugger);
+        create_debugger(_instance, &debug_info, null_alloc, &_debugger);
     }
 }
 
-instance::~instance() {
+vk_instance::~vk_instance() {
     const auto destroy_debugger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-        vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT"));
-    destroy_debugger(_instance, _debugger, NULL_ALLOC);
-    vkDestroyInstance(_instance, NULL_ALLOC);
+        vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT")
+    );
+    destroy_debugger(_instance, _debugger, null_alloc);
+    vkDestroyInstance(_instance, null_alloc);
 }
 
-std::vector<VkPhysicalDevice> instance::enumerate_physical_devices() const {
-    uint32_t device_count = 0;
+std::vector<VkPhysicalDevice> vk_instance::enumerate_physical_devices() const {
+    u32_t device_count = 0;
     vkEnumeratePhysicalDevices(_instance, &device_count, nullptr);
 
     std::vector<VkPhysicalDevice> devices(device_count);
     vkEnumeratePhysicalDevices(_instance, &device_count, devices.data());
     return devices;
+}
+
+vk_instance& vk_instance::operator=(vk_instance&& oth) {
+    // destroy
+    const auto destroy_debugger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+        vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT")
+    );
+    destroy_debugger(_instance, _debugger, null_alloc);
+    vkDestroyInstance(_instance, null_alloc);
+    // move
+    _instance = oth._instance;
+    _debugger = oth._debugger;
+    // null
+    oth._instance = VK_NULL_HANDLE;
+    oth._debugger = VK_NULL_HANDLE;
+    return *this;
 }
 
 }

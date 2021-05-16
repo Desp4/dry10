@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <vector>
+#include <span>
 
 namespace dry {
 
@@ -24,6 +25,8 @@ using f64_t = double;
 using size_t = std::size_t;
 
 using byte_vec = std::vector<std::byte>;
+using byte_span = std::span<std::byte>;
+using const_byte_span = std::span<const std::byte>;
 
 }
 

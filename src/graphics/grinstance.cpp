@@ -1,6 +1,6 @@
 #include "grinstance.hpp"
 #include "vkw/device/instance.hpp"
-#include "vkw/device/device.hpp"
+#include "vkw/device/g_device.hpp"
 #include "vkw/device/defconf.hpp"
 #include "dbg/log.hpp"
 
@@ -18,23 +18,23 @@ VKAPI_ATTR VkBool32 VKAPI_CALL graphics_instance::debug_callback(
     return VK_FALSE;
 }
 
-graphics_instance::graphics_instance(wsi::native_handle window) :
+graphics_instance::graphics_instance(const wsi::window& window) :
 #ifdef VKW_ENABLE_VAL_LAYERS
-    _instance(EXTENSIONS, VAL_LAYERS, debug_callback),
+    _instance(EXTENSIONS, nullptr, VAL_LAYERS, debug_callback),
 #else
-    _instance(EXTENSIONS, {}, nullptr),
+    _instance(EXTENSIONS, nullptr),
 #endif
-    _surface(&_instance, window)
+    _surface(_instance, window)
 {
     const auto phys_devices = _instance.enumerate_physical_devices();
     VkPhysicalDevice phys_device = VK_NULL_HANDLE;
     // NOTE : requested settings or bust, can write a few lines to have fallback options
     for (const auto device : phys_devices) {
-        if (vkw::conf::check_device_extension_support(device, DEV_EXTENSIONS) &&
-            vkw::conf::check_device_feature_support(device, FEATURES) &&
-            vkw::conf::check_device_queue_support(device, QUEUES) &&
-            vkw::conf::check_swap_format_support(device, _surface.vk_surface(), IMAGE_FORMAT, IMAGE_COLORSPACE) &&
-            vkw::conf::check_swap_present_mode_support(device, _surface.vk_surface(), IMAGE_PRESENT_MODE))
+        if (vkw::check_device_extension_support(device, DEV_EXTENSIONS) &&
+            vkw::check_device_feature_support(device, FEATURES) &&
+            vkw::check_device_queue_support(device, QUEUES) &&
+            vkw::check_swap_format_support(device, _surface.handle(), IMAGE_FORMAT, IMAGE_COLORSPACE) &&
+            vkw::check_swap_present_mode_support(device, _surface.handle(), IMAGE_PRESENT_MODE))
         {
             phys_device = device;
             break;
@@ -58,7 +58,7 @@ graphics_instance::graphics_instance(wsi::native_handle window) :
     std::vector<queue_ind_info*> family_inds(3);
 
     // get all queues, prefer dedicated, if not pick the first that satisfies the usage
-    tmp_queue_index = vkw::conf::get_present_index(queue_families, phys_device, _surface.vk_surface());
+    tmp_queue_index = vkw::get_present_index(queue_families, phys_device, _surface.handle());
     if (tmp_queue_index == -1) {
         LOG_ERR("could not find present queue");
         dbg::panic();
@@ -66,24 +66,24 @@ graphics_instance::graphics_instance(wsi::native_handle window) :
     family_inds[0] = &_present_queue;
     family_inds[0]->family_ind = tmp_queue_index;
 
-    tmp_queue_index = vkw::conf::get_separate_graphics_index(queue_families);
+    tmp_queue_index = vkw::get_separate_graphics_index(queue_families);
     if (tmp_queue_index == -1) {
-        tmp_queue_index = vkw::conf::get_any_index(queue_families, VK_QUEUE_GRAPHICS_BIT);
+        tmp_queue_index = vkw::get_any_index(queue_families, VK_QUEUE_GRAPHICS_BIT);
     }
     family_inds[1] = &_graphics_worker_queue;
     family_inds[1]->family_ind = tmp_queue_index;
 
-    tmp_queue_index = vkw::conf::get_separate_transfer_index(queue_families);
+    tmp_queue_index = vkw::get_separate_transfer_index(queue_families);
     if (tmp_queue_index == -1) {
-        tmp_queue_index = vkw::conf::get_any_index(queue_families, VK_QUEUE_TRANSFER_BIT);
+        tmp_queue_index = vkw::get_any_index(queue_families, VK_QUEUE_TRANSFER_BIT);
     }
     family_inds[2] = &_transfer_worker_queue;
     family_inds[2]->family_ind = tmp_queue_index;
 
     // what it does: create queueInfo for each separate family, if multiple of one - count them for submission
-    std::vector<vkw::device_main::queue_info> queue_infos;
+    std::vector<vkw::queue_info> queue_infos;
     for (int i = 0; i < family_inds.size(); ++i) {
-        vkw::device_main::queue_info queue_info;
+        vkw::queue_info queue_info;
         queue_info.queue_family_index = family_inds[i]->family_ind;
         queue_info.queue_count = 1;
 
@@ -110,11 +110,12 @@ graphics_instance::graphics_instance(wsi::native_handle window) :
         queue_infos.push_back(std::move(queue_info));
     }
 
-    vkw::device_main::create(phys_device, queue_infos, DEV_EXTENSIONS, FEATURES);
+    _device = vkw::vk_device{ phys_device, queue_infos, DEV_EXTENSIONS, FEATURES };
+    vkw::g_device = &_device;
 }
 
 graphics_instance::~graphics_instance() {
-    vkw::device_main::destroy();
+    vkw::g_device = nullptr; // TODO : enforce singleton
 }
 
 }

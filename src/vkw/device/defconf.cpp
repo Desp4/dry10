@@ -1,9 +1,9 @@
 #include "defconf.hpp"
 
-namespace dry::vkw::conf {
+namespace dry::vkw {
 
 bool check_device_extension_support(VkPhysicalDevice device, std::span<const char* const> extensions) {
-    uint32_t extension_count = 0;
+    u32_t extension_count = 0;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, nullptr);
     std::vector<VkExtensionProperties> supported_extensions(extension_count);
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, supported_extensions.data());
@@ -11,8 +11,9 @@ bool check_device_extension_support(VkPhysicalDevice device, std::span<const cha
     // or could use a set or something
     bool extensions_present = true;
     for (auto p = extensions.begin(); p != extensions.end() && extensions_present; ++p) {
+        const std::string_view extension = *p;
         for (const auto& supportedExtension : supported_extensions) {
-            if (extensions_present = !strcmp(supportedExtension.extensionName, *p)) {
+            if (extensions_present = supportedExtension.extensionName == extension) {
                 break;
             }
         }
@@ -25,17 +26,18 @@ bool check_device_feature_support(VkPhysicalDevice device, const VkPhysicalDevic
     vkGetPhysicalDeviceFeatures(device, &supported_features);
     const VkBool32* in_iterator = reinterpret_cast<const VkBool32*>(&features);
     const VkBool32* supported_iterator = reinterpret_cast<const VkBool32*>(&supported_features);
-    constexpr uint32_t limit = sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32);
+    constexpr u32_t limit = sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32);
 
+    // all fields in features are 4byte bools, aligned to 4
     bool features_present = true;
-    for (int i = 0; i < limit && features_present; ++i) {
+    for (auto i = 0u; i < limit && features_present; ++i) {
         features_present = !(*(in_iterator + i)) || !(*(in_iterator + i) ^ *(supported_iterator + i));
     }
     return features_present;
 }
 
 bool check_device_queue_support(VkPhysicalDevice device, VkQueueFlags queue_flags) {
-    uint32_t queue_family_count = 0;
+    u32_t queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
     std::vector<VkQueueFamilyProperties> families(queue_family_count);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, families.data());
@@ -47,7 +49,7 @@ bool check_device_queue_support(VkPhysicalDevice device, VkQueueFlags queue_flag
 }
 
 bool check_swap_format_support(VkPhysicalDevice device, VkSurfaceKHR surface, VkFormat format, VkColorSpaceKHR color_space) {
-    uint32_t count = 0;
+    u32_t count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, nullptr);
     std::vector<VkSurfaceFormatKHR> supported_formats(count);
     vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, supported_formats.data());
@@ -61,7 +63,7 @@ bool check_swap_format_support(VkPhysicalDevice device, VkSurfaceKHR surface, Vk
 }
 
 bool check_swap_present_mode_support(VkPhysicalDevice device, VkSurfaceKHR surface, VkPresentModeKHR present_mode) {
-    uint32_t count = 0;
+    u32_t count = 0;
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, nullptr);
     std::vector<VkPresentModeKHR> supported_modes(count);
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, supported_modes.data());
@@ -74,11 +76,11 @@ bool check_swap_present_mode_support(VkPhysicalDevice device, VkSurfaceKHR surfa
     return false;
 }
 
-// get index functions are carbon copies of https://github.com/charles-lunarg/vk-bootstrap/blob/master/src/VkBootstrap.cpp
+// get index functions are mostly copies of https://github.com/charles-lunarg/vk-bootstrap/blob/master/src/VkBootstrap.cpp
 
-int32_t get_separate_transfer_index(std::span<const VkQueueFamilyProperties> families) {
-    int32_t fallback = -1;
-    for (int i = 0; i < families.size(); ++i) {
+u32_t get_separate_transfer_index(std::span<const VkQueueFamilyProperties> families) {
+    u32_t fallback = (std::numeric_limits<u32_t>::max)();
+    for (auto i = 0u; i < families.size(); ++i) {
         const auto flags = families[i].queueFlags;
         if ((flags & VK_QUEUE_TRANSFER_BIT) && !(flags & VK_QUEUE_GRAPHICS_BIT)) {
             if (flags & VK_QUEUE_COMPUTE_BIT) {
@@ -91,9 +93,9 @@ int32_t get_separate_transfer_index(std::span<const VkQueueFamilyProperties> fam
     return fallback;
 }
 
-int32_t get_separate_graphics_index(std::span<const VkQueueFamilyProperties> families) {
-    int32_t fallback = -1;
-    for (int i = 0; i < families.size(); ++i) {
+u32_t get_separate_graphics_index(std::span<const VkQueueFamilyProperties> families) {
+    u32_t fallback = (std::numeric_limits<u32_t>::max)();
+    for (auto i = 0u; i < families.size(); ++i) {
         const auto flags = families[i].queueFlags;
         if ((flags & VK_QUEUE_GRAPHICS_BIT) && !(flags & VK_QUEUE_TRANSFER_BIT)) {
             if (flags & VK_QUEUE_COMPUTE_BIT) {
@@ -106,34 +108,34 @@ int32_t get_separate_graphics_index(std::span<const VkQueueFamilyProperties> fam
     return fallback;
 }
 
-int32_t get_separate_compute_index(std::span<const VkQueueFamilyProperties> families) {
-    for (int i = 0; i < families.size(); ++i) {
+u32_t get_separate_compute_index(std::span<const VkQueueFamilyProperties> families) {
+    for (auto i = 0u; i < families.size(); ++i) {
         const auto flags = families[i].queueFlags;
         if ((flags & VK_QUEUE_COMPUTE_BIT) && !(flags & VK_QUEUE_GRAPHICS_BIT) && !(flags & VK_QUEUE_TRANSFER_BIT)) {
             return i;
         }
     }
-    return -1;
+    return (std::numeric_limits<u32_t>::max)();
 }
 
-int32_t get_present_index(std::span<const VkQueueFamilyProperties> families, VkPhysicalDevice device, VkSurfaceKHR surface) {
-    for (int i = 0; i < families.size(); ++i) {
+u32_t get_present_index(std::span<const VkQueueFamilyProperties> families, VkPhysicalDevice device, VkSurfaceKHR surface) {
+    for (auto i = 0u; i < families.size(); ++i) {
         VkBool32 supported = VK_FALSE;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &supported);
         if (supported == VK_TRUE) {
             return i;
         }
     }
-    return -1;
+    return (std::numeric_limits<u32_t>::max)();
 }
 
-int32_t get_any_index(std::span<const VkQueueFamilyProperties> families, VkQueueFlags flags) {
-    for (int i = 0; i < families.size(); ++i) {
+u32_t get_any_index(std::span<const VkQueueFamilyProperties> families, VkQueueFlags flags) {
+    for (auto i = 0u; i < families.size(); ++i) {
         if (families[i].queueFlags & flags) {
             return i;
         }
     }
-    return -1;
+    return (std::numeric_limits<u32_t>::max)();
 }
 
 }

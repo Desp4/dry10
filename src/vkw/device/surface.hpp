@@ -1,26 +1,30 @@
 #pragma once
 
+#ifndef DRY_VK_SURFACE_H
+#define DRY_VK_SURFACE_H
+
 #include "instance.hpp"
 #include "window/window.hpp"
 
 namespace dry::vkw {
 
-class surface : public movable<surface> {
+class vk_surface{
 public:
-    using movable<surface>::operator=;
+    vk_surface(const vk_instance& instance, const wsi::window& window);
 
-    surface() = default;
-    surface(surface&&) = default;
-    surface(const instance* inst, wsi::native_handle handle);
-    ~surface();
+    vk_surface() = default;
+    vk_surface(vk_surface&& oth) { *this = std::move(oth); }
+    ~vk_surface();
 
-    const VkSurfaceKHR& vk_surface() const {
-        return _surface;
-    }
+    VkSurfaceKHR handle() const { return _surface; }
+
+    vk_surface& operator=(vk_surface&&);
 
 private:
-    nullable_ptr<const instance> _instance;
-    vk_handle<VkSurfaceKHR> _surface;
+    const vk_instance* _instance = nullptr;
+    VkSurfaceKHR _surface = VK_NULL_HANDLE;
 };
 
 }
+
+#endif

@@ -1,29 +1,32 @@
 #pragma once
 
-#include <vector>
+#ifndef DRY_VK_CMDBUFFER_H
+#define DRY_VK_CMDBUFFER_H
 
 #include "cmdpool.hpp"
 
 namespace dry::vkw {
 
-class cmd_buffer : public movable<cmd_buffer> {
+class vk_cmd_buffer {
 public:
-    using movable<cmd_buffer>::operator=;
+    vk_cmd_buffer(const vk_cmd_pool& pool);
 
-    cmd_buffer() = default;
-    cmd_buffer(cmd_buffer&&) = default;
-    cmd_buffer(const cmd_pool* pool);
-    ~cmd_buffer();
+    vk_cmd_buffer() = default;
+    vk_cmd_buffer(vk_cmd_buffer&& oth) { *this = std::move(oth); }
+    ~vk_cmd_buffer();
 
-    void begin(VkCommandBufferUsageFlags usage) const;
+    // defaults to none
+    void begin(VkCommandBufferUsageFlags usage = 0) const;
 
-    const VkCommandBuffer& buffer() const {
-        return _buffer;
-    }
+    VkCommandBuffer handle() const { return _buffer; }
+
+    vk_cmd_buffer& operator=(vk_cmd_buffer&&);
 
 private:
-    nullable_ptr<const cmd_pool> _pool;
-    vk_handle<VkCommandBuffer> _buffer;
+    const vk_cmd_pool* _pool = nullptr;
+    VkCommandBuffer _buffer = VK_NULL_HANDLE;
 };
 
 }
+
+#endif

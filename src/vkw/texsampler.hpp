@@ -1,24 +1,28 @@
 #pragma once
 
+#ifndef DRY_VK_TEXSAMPLER_H
+#define DRY_VK_TEXSAMPLER_H
+
 #include "vkw.hpp"
 
 namespace dry::vkw {
 
-class tex_sampler : public movable<tex_sampler> {
+class vk_tex_sampler {
 public:
-    using movable<tex_sampler>::operator=;
+    vk_tex_sampler(u32_t mip_levels);
 
-    tex_sampler() = default;
-    tex_sampler(tex_sampler&&) = default;
-    tex_sampler(uint32_t mip_levels);
-    ~tex_sampler();
+    vk_tex_sampler() = default;
+    vk_tex_sampler(vk_tex_sampler&& oth) { *this = std::move(oth); }
+    ~vk_tex_sampler();
 
-    const VkSampler& sampler() const {
-        return _sampler;
-    }
+    VkSampler handle() const { return _sampler; }
+
+    vk_tex_sampler& operator=(vk_tex_sampler&&);
 
 private:
-    vk_handle<VkSampler> _sampler;
+    VkSampler _sampler = VK_NULL_HANDLE;
 };
 
 }
+
+#endif

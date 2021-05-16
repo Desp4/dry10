@@ -1,41 +1,44 @@
 #pragma once
 
-#include <span>
-#include <vector>
+#ifndef DRY_VK_DEVICE_H
+#define DRY_VK_DEVICE_H
 
 #include "vkw/vkw.hpp"
 
 namespace dry::vkw {
 
-class device_main {
+struct queue_info {
+    u32_t queue_family_index;
+    u32_t queue_count;
+    std::vector<float> priorities;
+};
+
+class vk_device {
 public:
-    struct queue_info {
-        uint32_t queue_family_index;
-        uint32_t queue_count;
-        std::vector<float> priorities;
-    };
+    vk_device(
+        VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
+        std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features
+    );
 
-    static void create(VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
-                       std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features);
-    static void destroy();
+    vk_device() = default;
+    vk_device(vk_device&& oth) { *this = std::move(oth); }
+    ~vk_device();
 
-    static VkSurfaceCapabilitiesKHR surface_capabilities(VkSurfaceKHR surface);
-    static VkPhysicalDeviceMemoryProperties memory_properties();
+    VkSurfaceCapabilitiesKHR surface_capabilities(VkSurfaceKHR surface) const;
+    VkPhysicalDeviceMemoryProperties memory_properties() const;
     // returns UINT32_MAX on failure
-    static uint32_t find_memory_type_index(uint32_t type_filter, VkMemoryPropertyFlags properties);
-    static void wait_on_device();
+    u32_t find_memory_type_index(u32_t type_filter, VkMemoryPropertyFlags properties) const;
+    void wait_on_device() const;
 
-    static const VkDevice& device(){
-        return _device;
-    }
+    VkDevice handle()  const { return _device; }
+
+    vk_device& operator=(vk_device&&);
 
 private:
-    device_main() = default;
-
-    inline static VkDevice _device = VK_NULL_HANDLE;
-    inline static VkPhysicalDevice _phys_device = VK_NULL_HANDLE;
-
-    inline static bool _destroyed = false;
+    VkDevice _device = VK_NULL_HANDLE;
+    VkPhysicalDevice _phys_device = VK_NULL_HANDLE;
 };
 
 }
+
+#endif

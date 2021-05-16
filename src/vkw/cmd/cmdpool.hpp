@@ -1,24 +1,28 @@
 #pragma once
 
+#ifndef DRY_VK_CMDPOOL_H
+#define DRY_VK_CMDPOOL_H
+
 #include "vkw/vkw.hpp"
 
 namespace dry::vkw {
 
-class cmd_pool : public movable<cmd_pool> {
+class vk_cmd_pool {
 public:
-    using movable<cmd_pool>::operator=;
+    vk_cmd_pool(u32_t queue);
 
-    cmd_pool() = default;
-    cmd_pool(cmd_pool&&) = default;
-    cmd_pool(uint32_t queue);
-    ~cmd_pool();
+    vk_cmd_pool() = default;
+    vk_cmd_pool(vk_cmd_pool&& oth) { *this = std::move(oth); }
+    ~vk_cmd_pool();
 
-    const VkCommandPool& pool() const {
-        return _pool;
-    }
+    VkCommandPool handle() const { return _pool; }
+
+    vk_cmd_pool& operator=(vk_cmd_pool&&);
 
 private:
-    vk_handle<VkCommandPool> _pool;
+    VkCommandPool _pool = VK_NULL_HANDLE;
 };
 
 }
+
+#endif

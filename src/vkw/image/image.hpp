@@ -1,39 +1,39 @@
 #pragma once
 
+#ifndef DRY_VK_IMAGE_H
+#define DRY_VK_IMAGE_H
+
 #include "vkw/memory.hpp"
 
 namespace dry::vkw {
 
-class image_base : public movable<image_base> {
+class vk_image {
 public:
-    using movable<image_base>::operator=;
+    vk_image(
+        VkExtent2D dimensions, u32_t mip_lvls, VkSampleCountFlagBits samples, VkFormat img_format,
+        VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties
+    );
 
-    image_base() = default;
-    image_base(image_base&&) = default;
-    image_base(VkExtent2D dimensions, uint32_t mip_lvls, VkSampleCountFlagBits samples, VkFormat img_format,
-          VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties);
-    ~image_base();
+    vk_image() = default;
+    vk_image(vk_image&& oth) { *this = std::move(oth); }
+    ~vk_image();
 
-    const VkImage& image() const {
-        return _image;
-    }
-    const VkExtent2D& extent() const {
-        return _extent;
-    }
-    uint32_t mip_levels() const {
-        return _mip_levels;
-    }
-    VkFormat format() const {
-        return _format;
-    }
+    VkImage handle() const { return _image; }
+    VkExtent2D extent() const { return _extent; }
+    u32_t mip_levels() const { return _mip_levels; }
+    VkFormat format() const { return _format; }
+
+    vk_image& operator=(vk_image&&);
 
 private:
-    VkExtent2D _extent;
-    uint32_t _mip_levels;
-    VkFormat _format;
+    VkImage _image = VK_NULL_HANDLE;
+    vk_device_memory _memory;
 
-    vk_handle<VkImage> _image;
-    device_memory _memory;
+    VkExtent2D _extent;
+    u32_t _mip_levels;
+    VkFormat _format;
 };
 
 }
+
+#endif

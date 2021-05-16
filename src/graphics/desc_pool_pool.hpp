@@ -19,7 +19,7 @@ private:
     uint32_t _capacity;
     VkDescriptorSetLayout _layout;
 
-    std::vector<vkw::descriptor_pool> _pools;
+    std::vector<vkw::vk_descriptor_pool> _pools;
     std::vector<VkDescriptorSet> _available_sets;
 };
 

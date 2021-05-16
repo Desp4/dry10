@@ -1,16 +1,18 @@
+#include "renderpass.hpp"
+
 #include <array>
 
-#include "renderpass.hpp"
-#include "device/device.hpp"
+#include "device/g_device.hpp"
 
 namespace dry::vkw {
 
-render_pass::render_pass(VkExtent2D extent, render_pass_flags flags,
+vk_render_pass::vk_render_pass(
+    VkExtent2D extent, render_pass_flag flags,
     VkSampleCountFlagBits samples, VkFormat image_format, VkFormat depth_format) :
-    _extent(extent)
+    _extent{ extent }
 {
-    std::vector<VkAttachmentDescription> attachments(util::popcount(static_cast<uint32_t>(flags)));
-    uint32_t index = 0;
+    std::vector<VkAttachmentDescription> attachments(popcount(static_cast<u32_t>(flags)));
+    u32_t index = 0;
     const bool has_color = static_cast<bool>(flags & render_pass_flags::color);
     const bool has_depth = static_cast<bool>(flags & render_pass_flags::depth);
     const bool has_msaa = static_cast<bool>(flags & render_pass_flags::msaa);
@@ -88,42 +90,42 @@ render_pass::render_pass(VkExtent2D extent, render_pass_flags flags,
     render_pass_info.pSubpasses = &subpass;
     render_pass_info.dependencyCount = 1;
     render_pass_info.pDependencies = &dependency;
-    vkCreateRenderPass(device_main::device(), &render_pass_info, NULL_ALLOC, &_pass);
+    vkCreateRenderPass(g_device->handle(), &render_pass_info, null_alloc, &_pass);
 
     if (has_depth) {
-        _depth_image = image_view_pair(
+        _depth_image = vk_image_view_pair{
             _extent, 1, samples, depth_format, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT
-        );
+        };
     }
     if (has_msaa) {
-        _color_image = image_view_pair(
+        _color_image = vk_image_view_pair{
             _extent, 1, samples, image_format, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT
-        );
+        };
     }
 }
 
-render_pass::~render_pass() {
-    vkDestroyRenderPass(device_main::device(), _pass, NULL_ALLOC);
+vk_render_pass::~vk_render_pass() {
+    vkDestroyRenderPass(g_device->handle(), _pass, null_alloc);
 }
 
-void render_pass::create_framebuffers(std::span<const image_view> swap_views) {
+void vk_render_pass::create_framebuffers(std::span<const vk_image_view> swap_views) {
     _framebuffers.resize(swap_views.size());
     std::array<VkImageView, 3> frame_views{
-        _color_image.view().view(), _depth_image.view().view()
+        _color_image.view().handle(), _depth_image.view().handle()
     };
 
     for (auto i = 0u; i < _framebuffers.size(); ++i) {
-        frame_views[2] = swap_views[i].view();
-        _framebuffers[i] = framebuffer(_pass, frame_views, _extent);
+        frame_views[2] = swap_views[i].handle();
+        _framebuffers[i] = vk_framebuffer{ _pass, frame_views, _extent };
     }
 }
 
-void render_pass::start_cmd_pass(const cmd_buffer& buf, uint32_t frame_ind) const {
-    buf.begin(0);
+void vk_render_pass::start_cmd_pass(const vk_cmd_buffer& buf, u32_t frame_ind) const {
+    buf.begin();
 
     std::vector<VkClearValue> clear_values(1);
     clear_values[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -134,11 +136,27 @@ void render_pass::start_cmd_pass(const cmd_buffer& buf, uint32_t frame_ind) cons
     VkRenderPassBeginInfo pass_begin_info{};
     pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     pass_begin_info.renderPass = _pass;
-    pass_begin_info.framebuffer = _framebuffers[frame_ind].buffer();
+    pass_begin_info.framebuffer = _framebuffers[frame_ind].handle();
     pass_begin_info.renderArea = { {0, 0} , _extent };
-    pass_begin_info.clearValueCount = static_cast<uint32_t>(clear_values.size());
+    pass_begin_info.clearValueCount = static_cast<u32_t>(clear_values.size());
     pass_begin_info.pClearValues = clear_values.data();
-    vkCmdBeginRenderPass(buf.buffer(), &pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(buf.handle(), &pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+vk_render_pass& vk_render_pass::operator=(vk_render_pass&& oth) {
+    // destroy
+    vkDestroyRenderPass(g_device->handle(), _pass, null_alloc);
+    // move
+    _pass = oth._pass;
+    _depth_image = std::move(oth._depth_image);
+    _color_image = std::move(oth._color_image);
+    _framebuffers = std::move(oth._framebuffers);
+    _extent = oth._extent;
+    _samples = oth._samples;
+    _depth_enabled = oth._depth_enabled;
+    // null
+    oth._pass = VK_NULL_HANDLE;
+    return *this;
 }
 
 }

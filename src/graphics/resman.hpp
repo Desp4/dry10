@@ -54,22 +54,22 @@ public:
 
 private:
     struct mesh_data {
-        vkw::buffer_base vertex_buffer;
-        vkw::buffer_base index_buffer;
+        vkw::vk_buffer vertex_buffer;
+        vkw::vk_buffer index_buffer;
     };
     struct combined_sampler_data {
-        vkw::image_view_pair texture;
-        vkw::tex_sampler sampler;
+        vkw::vk_image_view_pair texture;
+        vkw::vk_tex_sampler sampler;
     };
     struct persistent_recording_data {
         size_t mesh_id;
         std::vector<VkDescriptorSet> descriptor_sets;
     };
     struct pipeline_group {
-        vkw::pipeline_graphics pipeline;
+        vkw::vk_pipeline_graphics pipeline;
         util::sparse_set<persistent_recording_data> recording_data;
         descriptor_pool_pool textured_desc_pool; // TODO : think about descriptors
-        vkw::descriptor_layout layout;
+        vkw::vk_descriptor_layout layout;
         uint32_t true_size;
     };
     struct expired_renderable {
@@ -102,8 +102,8 @@ private:
     renderer _renderer;
     frame_context _frame_ctx;
 
-    vkw::queue_graphics _graphics_queue;
-    vkw::queue_transfer _transfer_queue;
+    vkw::vk_queue_graphics _graphics_queue;
+    vkw::vk_queue_transfer _transfer_queue;
 
     // meshes, samplers and pipelines in an unurdered map where size_t is a dab asset hash value for fast user level lookup
     // meshes and samplers don't need to be contiguous so can be a persistent array if not for dab hashes
@@ -113,7 +113,7 @@ private:
     std::unordered_map<size_t, refcounted_t<combined_sampler_data>> _combined_samplers;
     // ubos
     // NOTE : persistent array allocations are deterministic so every single one has the same index for a given ubo
-    std::vector<util::persistent_array<vkw::buffer_base>> _ubos;
+    std::vector<util::persistent_array<vkw::vk_buffer>> _ubos;
 
     std::unordered_map<size_t, pipeline_group> _pipeline_groups;
     std::deque<expired_renderable> _expired_recording_datas;
