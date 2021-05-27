@@ -92,7 +92,7 @@ public:
 
     template<typename... Args>
     void emplace(entity ent, Args&&... args) {
-        // NOTE : looked up in entt, emplace won't work for say containers with args as their values
+        // NOTE : looked up in entt, emplace won't work for say initializer lists
         if constexpr (std::is_aggregate_v<Component>) {
             _components.push_back(Component{ std::forward<Args>(args)... });
         } else {

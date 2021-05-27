@@ -3,7 +3,7 @@
 namespace dry::vkw {
 
 void vk_queue_graphics::transition_image_layout(const vk_image& image, VkImageLayout layout_old, VkImageLayout layout_new) const {
-    vk_cmd_buffer cmd_buf{ _pool };
+    vk_cmd_buffer cmd_buf{ *_device, _pool };
     cmd_buf.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     VkPipelineStageFlags stage_src{}, stage_dst{};
@@ -52,7 +52,7 @@ void vk_queue_graphics::transition_image_layout(const vk_image& image, VkImageLa
 }
 
 void vk_queue_graphics::generate_mip_maps(const vk_image& image) const {
-    vk_cmd_buffer cmd_buf{ _pool };
+    vk_cmd_buffer cmd_buf{ *_device, _pool };
     cmd_buf.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     VkImageMemoryBarrier barrier{};

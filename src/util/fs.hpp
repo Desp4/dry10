@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef DRY_FS_H
-#define DRY_FS_H
+#ifndef DRY_UTIL_FS_H
+#define DRY_UTIL_FS_H
 
 #include <filesystem>
 

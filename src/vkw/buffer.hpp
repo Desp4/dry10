@@ -9,13 +9,12 @@ namespace dry::vkw {
 
 class vk_buffer {
 public:
-    vk_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
+    vk_buffer(const vk_device& device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
 
     vk_buffer() = default;
     vk_buffer(vk_buffer&& oth) { *this = std::move(oth); }
     ~vk_buffer();
 
-    // TODO : if local buffer has the same functionality as a non-local one keep it, if not separate the two into different structures
     template<typename T>
     void write(const T& value) { _memory.write(&value, sizeof(T)); }
     template<typename T>
@@ -30,6 +29,7 @@ public:
     vk_buffer& operator=(vk_buffer&&);
 
 private:
+    const vk_device* _device = nullptr;
     VkBuffer _buffer = VK_NULL_HANDLE;
     vk_device_memory _memory;
     VkDeviceSize _true_size = 0;

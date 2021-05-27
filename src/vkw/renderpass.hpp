@@ -20,7 +20,7 @@ constexpr render_pass_flag msaa = 0x4;
 
 class vk_render_pass {
 public:
-    vk_render_pass(
+    vk_render_pass(const vk_device& device,
         VkExtent2D extent, render_pass_flag flags, VkSampleCountFlagBits samples,
         VkFormat image_format, VkFormat depth_format
     );
@@ -39,6 +39,7 @@ public:
     vk_render_pass& operator=(vk_render_pass&&);
 
 private:
+    const vk_device* _device = nullptr;
     VkRenderPass _pass = VK_NULL_HANDLE;
 
     vk_image_view_pair _depth_image;

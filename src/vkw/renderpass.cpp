@@ -2,13 +2,12 @@
 
 #include <array>
 
-#include "device/g_device.hpp"
-
 namespace dry::vkw {
 
-vk_render_pass::vk_render_pass(
+vk_render_pass::vk_render_pass(const vk_device& device,
     VkExtent2D extent, render_pass_flag flags,
     VkSampleCountFlagBits samples, VkFormat image_format, VkFormat depth_format) :
+    _device{ &device },
     _extent{ extent }
 {
     std::vector<VkAttachmentDescription> attachments(popcount(static_cast<u32_t>(flags)));
@@ -90,17 +89,17 @@ vk_render_pass::vk_render_pass(
     render_pass_info.pSubpasses = &subpass;
     render_pass_info.dependencyCount = 1;
     render_pass_info.pDependencies = &dependency;
-    vkCreateRenderPass(g_device->handle(), &render_pass_info, null_alloc, &_pass);
-
+    vkCreateRenderPass(_device->handle(), &render_pass_info, null_alloc, &_pass);
+    // TODO : framebuffer constructrion doesn't work without all 3 flags
     if (has_depth) {
-        _depth_image = vk_image_view_pair{
+        _depth_image = vk_image_view_pair{ *_device,
             _extent, 1, samples, depth_format, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT
         };
     }
     if (has_msaa) {
-        _color_image = vk_image_view_pair{
+        _color_image = vk_image_view_pair{ *_device,
             _extent, 1, samples, image_format, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_COLOR_BIT
@@ -109,7 +108,9 @@ vk_render_pass::vk_render_pass(
 }
 
 vk_render_pass::~vk_render_pass() {
-    vkDestroyRenderPass(g_device->handle(), _pass, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyRenderPass(_device->handle(), _pass, null_alloc);
+    }
 }
 
 void vk_render_pass::create_framebuffers(std::span<const vk_image_view> swap_views) {
@@ -120,13 +121,12 @@ void vk_render_pass::create_framebuffers(std::span<const vk_image_view> swap_vie
 
     for (auto i = 0u; i < _framebuffers.size(); ++i) {
         frame_views[2] = swap_views[i].handle();
-        _framebuffers[i] = vk_framebuffer{ _pass, frame_views, _extent };
+        _framebuffers[i] = vk_framebuffer{ *_device, _pass, frame_views, _extent };
     }
 }
 
 void vk_render_pass::start_cmd_pass(const vk_cmd_buffer& buf, u32_t frame_ind) const {
     buf.begin();
-
     std::vector<VkClearValue> clear_values(1);
     clear_values[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
     if (_depth_enabled) {
@@ -145,8 +145,11 @@ void vk_render_pass::start_cmd_pass(const vk_cmd_buffer& buf, u32_t frame_ind) c
 
 vk_render_pass& vk_render_pass::operator=(vk_render_pass&& oth) {
     // destroy
-    vkDestroyRenderPass(g_device->handle(), _pass, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyRenderPass(_device->handle(), _pass, null_alloc);
+    }
     // move
+    _device = oth._device;
     _pass = oth._pass;
     _depth_image = std::move(oth._depth_image);
     _color_image = std::move(oth._color_image);
@@ -155,7 +158,7 @@ vk_render_pass& vk_render_pass::operator=(vk_render_pass&& oth) {
     _samples = oth._samples;
     _depth_enabled = oth._depth_enabled;
     // null
-    oth._pass = VK_NULL_HANDLE;
+    oth._device = nullptr;
     return *this;
 }
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef DRY_NUM_H
-#define DRY_NUM_H
+#ifndef DRY_UTIL_NUM_H
+#define DRY_UTIL_NUM_H
 
 #include <cstdint>
 #include <cstddef>

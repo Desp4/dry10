@@ -1,49 +1,58 @@
 #pragma once
 
+#ifndef DRY_UTIL_PERSISTENT_ARRAY_H
+#define DRY_UTIL_PERSISTENT_ARRAY_H
+
 #include <limits>
 #include <algorithm>
 
-#include "util.hpp"
+#include "num.hpp"
 
-namespace dry::util {
+namespace dry {
 
-using size_pt = uint32_t;
-static constexpr size_pt size_pt_null = std::numeric_limits<size_pt>::max();
+using persistent_index_type = u64_t;
+static constexpr persistent_index_type persistent_index_null = (std::numeric_limits<persistent_index_type>::max)();
 
 template<typename T>
 class persistent_array {
 public:
+    using index_type = persistent_index_type;
+    static constexpr index_type index_null = persistent_index_null;
+
+private:
     union union_t {
         ~union_t() = delete;
 
         T type;
-        size_pt available;
+        index_type available;
     };
 
-    persistent_array(size_pt capacity = 0) :
-        _array(nullptr),
-        _capacity(0),
-        _head(0),
-        _available(size_pt_null),
-        _available_capacity(0)
+public:
+    persistent_array(index_type capacity = 0) noexcept :
+        _array{ nullptr },
+        _capacity{ 0 },
+        _head{ 0 },
+        _available{ index_null },
+        _available_capacity{ 0 }
     {
         reserve(capacity);
     }
+    // NOTE : copies as is, doesn't compress allocated elements into a contiguous range
     persistent_array(const persistent_array& oth) :
-        persistent_array(oth._head)
+        persistent_array{ oth._head }
     {
         if (oth._array == nullptr) {
             return;
         }
 
         if constexpr (std::is_trivially_copyable_v<T>) {
-            std::memcpy(_array, oth._array, oth._head * sizeof(union_t));
+            std::copy(oth._array, oth._array + oth._head, _array);
         } else {
-            auto copy_lambda = [this, &oth](size_pt ind) {
+            auto copy_lambda = [this, &oth](index_type ind) {
                 construct_type(&_array[ind].type, oth._array[ind].type);
             };
             oth.apply_to_range(copy_lambda);
-            for (size_pt av_it = oth._available; av_it != size_pt_null; av_it = oth._array[av_it].available) {
+            for (index_type av_it = oth._available; av_it != index_null; av_it = oth._array[av_it].available) {
                 _array[av_it].available = oth._array[av_it].available;
             }
         }
@@ -53,14 +62,8 @@ public:
         _available_capacity = oth._available_capacity;
     }
 
-    persistent_array(persistent_array&& oth) noexcept :
-        _array(oth._array),
-        _capacity(oth._capacity),
-        _head(oth._head),
-        _available(oth._available),
-        _available_capacity(oth._available_capacity)
-    {
-        oth._array = nullptr;
+    persistent_array(persistent_array&& oth) noexcept {
+        *this = std::move(oth);
     }
 
     ~persistent_array() {
@@ -69,7 +72,7 @@ public:
         }
 
         if constexpr (!std::is_trivially_destructible_v<T>) {
-            auto destroy_lambda = [this](size_pt ind) {
+            auto destroy_lambda = [this](index_type ind) {
                 _array[ind].type.~T();
             };
             apply_to_range(destroy_lambda);
@@ -77,7 +80,7 @@ public:
         ::operator delete(static_cast<void*>(_array));
     }
 
-    void reserve(size_pt capacity) {
+    void reserve(index_type capacity) {
         if (capacity <= _head) {
             return;
         }
@@ -85,15 +88,16 @@ public:
         union_t* new_array = reinterpret_cast<union_t*>(::operator new(sizeof(union_t) * capacity));
         if (_array != nullptr) {
             if constexpr (std::is_trivially_move_assignable_v<T> && std::is_trivially_destructible_v<T>) {
-                std::memcpy(new_array, _array, _head * sizeof(union_t));
+                std::copy(_array, _array + _head, new_array);
+                //std::memcpy(new_array, _array, _head * sizeof(union_t));
             }
             else {
-                auto move_lambda = [new_array, this](size_pt ind) {
+                auto move_lambda = [new_array, this](index_type ind) {
                     construct_type(&new_array[ind].type, std::move(_array[ind].type));
                     _array[ind].type.~T();
                 };
                 apply_to_range(move_lambda);
-                for (size_pt av_it = _available; av_it != size_pt_null; av_it = _array[av_it].available) {
+                for (index_type av_it = _available; av_it != index_null; av_it = _array[av_it].available) {
                     new_array[av_it].available = _array[av_it].available;
                 }
             }
@@ -104,10 +108,10 @@ public:
     }
 
     template<typename... Args>
-    size_pt emplace(Args&&... args) {
-        size_pt ret_pos = size_pt_null;
+    index_type emplace(Args&&... args) {
+        index_type ret_pos = index_null;
 
-        if (_available != size_pt_null) {
+        if (_available != index_null) {
             ret_pos = _available;
             _available = _array[_available].available;
             construct_type(&_array[ret_pos].type, std::forward<Args>(args)...);
@@ -126,7 +130,7 @@ public:
         return ret_pos;
     }
 
-    void remove(size_pt index) noexcept {
+    void remove(index_type index) noexcept {
         _array[index].type.~T();
         _array[index].available = _available;
 
@@ -134,18 +138,61 @@ public:
         _available_capacity += 1;
     }
 
-    const T& operator[](size_pt index) const noexcept {
+    const T& operator[](index_type index) const noexcept {
         return _array[index].type;
     }
-    T& operator[](size_pt index) noexcept {
+    T& operator[](index_type index) noexcept {
         return _array[index].type;
     }
 
-    size_pt available_sparse() const noexcept {
+    index_type available_sparse() const noexcept {
         return _available_capacity;
     }
-    size_pt size() const noexcept {
+    index_type size() const noexcept {
         return _head - _available_capacity;
+    }
+
+    persistent_array& operator=(persistent_array&& oth) noexcept {
+        // destroy
+        if (_array != nullptr) {
+            if constexpr (!std::is_trivially_destructible_v<T>) {
+                auto destroy_lambda = [this](index_type ind) {
+                    _array[ind].type.~T();
+                };
+                apply_to_range(destroy_lambda);
+            }
+            ::operator delete(static_cast<void*>(_array));
+        }
+        // move
+        _array = oth._array;
+        _capacity = oth._capacity;
+        _head = oth._head;
+        _available = oth._available;
+        _available_capacity = oth._available_capacity;
+        // null
+        oth._array = nullptr;
+        return *this;
+    }
+
+    persistent_array& operator=(const persistent_array& oth) {
+        if (&oth == this) {
+            return *this;
+        }
+        // tmp copy
+        persistent_array tmp{ oth };
+        // destroy
+        if (_array != nullptr) {
+            if constexpr (!std::is_trivially_destructible_v<T>) {
+                auto destroy_lambda = [this](index_type ind) {
+                    _array[ind].type.~T();
+                };
+                apply_to_range(destroy_lambda);
+            }
+            ::operator delete(static_cast<void*>(_array));
+        }
+        // move tmp
+        *this = std::move(tmp);
+        return *this;
     }
 
 private:
@@ -155,18 +202,18 @@ private:
     }
     template<typename Functor>
     void apply_to_range(Functor functor) {
-        size_pt* available_array = new size_pt[_available_capacity];
+        index_type* available_array = new index_type[_available_capacity];
 
-        size_pt* curr_av_elem = available_array;
-        for (size_pt av_it = _available; av_it != size_pt_null; av_it = _array[av_it].available) {
+        index_type* curr_av_elem = available_array;
+        for (index_type av_it = _available; av_it != index_null; av_it = _array[av_it].available) {
             *curr_av_elem = av_it;
             curr_av_elem += 1;
         }
         std::sort(available_array, available_array + _available_capacity);
 
-        size_pt arr_it = 0;
+        index_type arr_it = 0;
         for (auto i = 0u; i < _available_capacity; ++i) {
-            const size_pt fragment_limit = available_array[i];
+            const index_type fragment_limit = available_array[i];
             for (;arr_it < fragment_limit; ++arr_it) {
                 functor(arr_it);
             }
@@ -179,18 +226,18 @@ private:
     }
     template<typename Functor>
     void apply_to_range(Functor functor) const {
-        size_pt* available_array = new size_pt[_available_capacity];
+        index_type* available_array = new index_type[_available_capacity];
 
-        size_pt* curr_av_elem = available_array;
-        for (size_pt av_it = _available; av_it != size_pt_null; av_it = _array[av_it].available) {
+        index_type* curr_av_elem = available_array;
+        for (index_type av_it = _available; av_it != index_null; av_it = _array[av_it].available) {
             *curr_av_elem = av_it;
             curr_av_elem += 1;
         }
         std::sort(available_array, available_array + _available_capacity);
 
-        size_pt arr_it = 0;
+        index_type arr_it = 0;
         for (auto i = 0u; i < _available_capacity; ++i) {
-            const size_pt fragment_limit = available_array[i];
+            const index_type fragment_limit = available_array[i];
             for (;arr_it < fragment_limit; ++arr_it) {
                 functor(arr_it);
             }
@@ -203,11 +250,13 @@ private:
     }
 
     union_t* _array;
-    size_pt _head;
-    size_pt _capacity;
-    size_pt _available;
+    index_type _head;
+    index_type _capacity;
+    index_type _available;
     // for trivial types doesn't contribute anything, allows to dynamically alocate the available range only once
-    size_pt _available_capacity;
+    index_type _available_capacity;
 };
 
 }
+
+#endif

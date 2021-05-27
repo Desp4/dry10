@@ -1,10 +1,9 @@
 #include "shader.hpp"
 
-#include "vkw/device/g_device.hpp"
-
 namespace dry::vkw {
 
-vk_shader_module::vk_shader_module(const_byte_span bin, VkShaderStageFlagBits type) :
+vk_shader_module::vk_shader_module(const vk_device& device, const_byte_span bin, VkShaderStageFlagBits type) :
+    _device{ &device },
     _type{ type }
 {
     VkShaderModuleCreateInfo shader_info{};
@@ -12,20 +11,26 @@ vk_shader_module::vk_shader_module(const_byte_span bin, VkShaderStageFlagBits ty
     shader_info.codeSize = bin.size();
     shader_info.pCode = reinterpret_cast<const u32_t*>(bin.data());
 
-    vkCreateShaderModule(g_device->handle(), &shader_info, null_alloc, &_module);
+    vkCreateShaderModule(_device->handle(), &shader_info, null_alloc, &_module);
 }
 
 vk_shader_module::~vk_shader_module() {
-    vkDestroyShaderModule(g_device->handle(), _module, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyShaderModule(_device->handle(), _module, null_alloc);
+    }   
 }
 
 vk_shader_module& vk_shader_module::operator=(vk_shader_module&& oth) {
     // destroy
-    vkDestroyShaderModule(g_device->handle(), _module, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyShaderModule(_device->handle(), _module, null_alloc);
+    }
     // move
+    _device = oth._device;
     _module = oth._module;
+    _type = oth._type;
     // null
-    oth._module = VK_NULL_HANDLE;
+    oth._device = nullptr;
     return *this;
 }
 

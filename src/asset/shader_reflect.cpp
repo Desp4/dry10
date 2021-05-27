@@ -4,6 +4,13 @@
 
 #include <spirv_cross/spirv_cross.hpp>
 
+static constexpr bool operator==(const VkDescriptorSetLayoutBinding& l, const VkDescriptorSetLayoutBinding& r) noexcept {
+    return
+        l.binding == r.binding && l.descriptorCount == r.descriptorCount &&
+        l.descriptorType == r.descriptorType && l.pImmutableSamplers == r.pImmutableSamplers &&
+        l.stageFlags == r.stageFlags;
+}
+
 namespace dry::asset {
 
 namespace spvc = spirv_cross;
@@ -25,12 +32,13 @@ static VkFormat spir_vkformat(const spvc::SPIRType& type) noexcept {
     return VK_FORMAT_UNDEFINED;
 }
 
-static void write_ubos(
+template<VkDescriptorType Desc_Type>
+static void write_buffers(
     const spvc::Compiler& compiler,
     const spvc::SmallVector<spvc::Resource>& resources,
     VkShaderStageFlagBits stage,
     std::vector<vk_shader_data::descriptor_info<VkDescriptorBufferInfo>>& out_ubo,
-    std::vector<VkDescriptorSetLayoutBinding>& out_layout)
+    std::vector<VkDescriptorSetLayoutBinding>& out_layout, std::vector<VkDescriptorSetLayoutBinding>& exclude)
 {
     out_ubo.reserve(out_ubo.size() + resources.size());
     out_layout.reserve(out_layout.size() + resources.size());
@@ -38,9 +46,16 @@ static void write_ubos(
     for (const auto& resource : resources) {
         VkDescriptorSetLayoutBinding binding{};
         binding.binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        binding.descriptorType = Desc_Type;
         binding.descriptorCount = 1; // NOTE : 1 descriptor
         binding.stageFlags = stage;
+        binding.pImmutableSamplers = nullptr;
+        
+        auto it = std::find(exclude.begin(), exclude.end(), binding);
+        if (it != exclude.end()) {
+            exclude.erase(it);
+            continue;
+        }
 
         VkDescriptorBufferInfo buffer{};
         buffer.buffer = VK_NULL_HANDLE;
@@ -57,7 +72,7 @@ static void write_combined_sampler(
     const spvc::SmallVector<spvc::Resource>& resources,
     VkShaderStageFlagBits stage,
     std::vector<vk_shader_data::descriptor_info<VkDescriptorImageInfo>>& out_combined,
-    std::vector<VkDescriptorSetLayoutBinding>& out_layout)
+    std::vector<VkDescriptorSetLayoutBinding>& out_layout, std::vector<VkDescriptorSetLayoutBinding>& exclude)
 {
     out_combined.reserve(out_combined.size() + resources.size());
     out_layout.reserve(out_layout.size() + resources.size());
@@ -68,7 +83,15 @@ static void write_combined_sampler(
         binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         binding.descriptorCount = 1; // NOTE : 1 descriptor
         binding.stageFlags = stage;
+        binding.pImmutableSamplers = nullptr;
 
+        auto it = std::find(exclude.begin(), exclude.end(), binding);
+        if (it != exclude.end()) {
+            exclude.erase(it);
+            continue;
+        }
+
+        // TODO : ?? I don't even fill these
         VkDescriptorImageInfo combined_sampler{};
         combined_sampler.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         combined_sampler.imageView = VK_NULL_HANDLE;
@@ -81,7 +104,7 @@ static void write_combined_sampler(
 
 }
 
-vk_shader_data shader_vk_info(const shader_source& shader) {
+vk_shader_data shader_vk_info(const shader_source& shader, std::vector<VkDescriptorSetLayoutBinding> exclude) {
     vk_shader_data vk_data;
     // these are too big for a stack, moving to heap
     std::unique_ptr compiler = std::make_unique<const spvc::Compiler>(
@@ -111,13 +134,17 @@ vk_shader_data shader_vk_info(const shader_source& shader) {
     // write input uniforms
     const auto vert_stage = shader_vk_stage(shader.vert_stage.stage);
 
-    vkspv::write_ubos(
+    vkspv::write_buffers<VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER>(
         *compiler, resources->uniform_buffers, vert_stage,
-        vk_data.buffer_infos, vk_data.layout_bindings
+        vk_data.buffer_infos, vk_data.layout_bindings, exclude
+    );
+    vkspv::write_buffers<VK_DESCRIPTOR_TYPE_STORAGE_BUFFER>(
+        *compiler, resources->storage_buffers, vert_stage,
+        vk_data.buffer_infos, vk_data.layout_bindings, exclude
     );
     vkspv::write_combined_sampler(
         *compiler, resources->sampled_images, vert_stage,
-        vk_data.comb_sampler_infos, vk_data.layout_bindings
+        vk_data.comb_sampler_infos, vk_data.layout_bindings, exclude
     );
 
     // write other stages
@@ -127,15 +154,24 @@ vk_shader_data shader_vk_info(const shader_source& shader) {
 
         const auto vk_stage = shader_vk_stage(stage.stage);
 
-        vkspv::write_ubos(
-            *compiler, resources->uniform_buffers, vk_stage,
-            vk_data.buffer_infos, vk_data.layout_bindings
+        vkspv::write_buffers<VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER>(
+            *compiler, resources->uniform_buffers, vert_stage,
+            vk_data.buffer_infos, vk_data.layout_bindings, exclude
+        );
+        vkspv::write_buffers<VK_DESCRIPTOR_TYPE_STORAGE_BUFFER>(
+            *compiler, resources->storage_buffers, vert_stage,
+            vk_data.buffer_infos, vk_data.layout_bindings, exclude
         );
         vkspv::write_combined_sampler(
             *compiler, resources->sampled_images, vk_stage,
-            vk_data.comb_sampler_infos, vk_data.layout_bindings
+            vk_data.comb_sampler_infos, vk_data.layout_bindings, exclude
         );
     }
+    if (exclude.size() != 0) {
+        LOG_ERR("Exclude layout bindings not exhausted, invalid shader");
+        dbg::panic();
+    }
+
     return vk_data;
 }
 

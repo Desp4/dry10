@@ -50,7 +50,7 @@ public:
     }
 
 private:
-    util::persistent_array<entity> _entities;
+    persistent_array<entity> _entities;
     std::vector<pool_base> _component_pools;
 };
 

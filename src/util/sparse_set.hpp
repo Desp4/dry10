@@ -1,33 +1,35 @@
 #pragma once
 
-#include <vector>
+#ifndef DRY_UTIL_SPARSE_SET_H
+#define DRY_UTIL_SPARSE_SET_H
 
 #include "persistent_array.hpp"
 
-namespace dry::util {
+namespace dry {
 
 template<typename T>
 class sparse_set {
 public:
+    using index_type = u64_t;
     using iterator = typename std::vector<T>::iterator;
     using const_iterator = typename std::vector<T>::const_iterator;
 
-    sparse_set(size_pt capacity = 0) :
-        _sparse(capacity)
+    sparse_set(index_type capacity = 0) :
+        _sparse{ capacity }
     {
         _dense.reserve(capacity);
         _sparse_ref.reserve(capacity);
     }
 
     template<typename... Args>
-    size_pt emplace(Args&&... args) {
-        const size_pt last_ind = _sparse.emplace(static_cast<size_pt>(_dense.size()));
+    index_type emplace(Args&&... args) {
+        const index_type last_ind = _sparse.emplace(static_cast<index_type>(_dense.size()));
         _dense.emplace_back(std::forward<Args>(args)...);
         _sparse_ref.push_back(last_ind);
         return last_ind;
     }
-    void remove(size_pt index) {
-        const size_pt dense_index = _sparse[index];
+    void remove(index_type index) {
+        const index_type dense_index = _sparse[index];
         _sparse.remove(index);
 
         std::swap(_dense[dense_index], _dense.back());
@@ -42,7 +44,7 @@ public:
         remove(_sparse[_sparse_ref[pos - _dense.begin()]]);
     }
 
-    void reserve(size_pt capacity) {
+    void reserve(index_type capacity) {
         _sparse.reserve(capacity);
         _dense.reserve(capacity);
         _sparse_ref.reserve(capacity);
@@ -52,7 +54,7 @@ public:
         _dense.shrink_to_fit();
     }
 
-    size_pt size() const {
+    index_type size() const {
         return _dense.size();
     }
 
@@ -81,17 +83,22 @@ public:
         return _dense.data();
     }
 
-    const T& operator[](size_pt index) const {
+    const T& operator[](index_type index) const {
         return _dense[_sparse[index]];
     }
-    T& operator[](size_pt index) {
+    T& operator[](index_type index) {
         return _dense[_sparse[index]];
     }
+    // NOTE : works only when persistent_array copies as is
+    sparse_set& operator=(sparse_set&) = default;
+    sparse_set& operator=(sparse_set&&) = default;
 
 private:
-    persistent_array<size_pt> _sparse;
+    persistent_array<index_type> _sparse;
     std::vector<T> _dense;
-    std::vector<size_pt> _sparse_ref;
+    std::vector<index_type> _sparse_ref;
 };
 
 }
+
+#endif

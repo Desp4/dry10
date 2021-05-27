@@ -1,12 +1,11 @@
 #include "image.hpp"
 
-#include "vkw/device/g_device.hpp"
-
 namespace dry::vkw {
 
-vk_image::vk_image(
+vk_image::vk_image(const vk_device& device,
     VkExtent2D dimensions, u32_t mip_lvls, VkSampleCountFlagBits samples, VkFormat img_format,
     VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties) :
+    _device{ &device },
     _extent{ dimensions },
     _mip_levels{ mip_lvls },
     _format{ img_format }
@@ -26,32 +25,37 @@ vk_image::vk_image(
     image_info.samples = samples;
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    vkCreateImage(g_device->handle(), &image_info, null_alloc, &_image);
+    vkCreateImage(_device->handle(), &image_info, null_alloc, &_image);
     VkMemoryRequirements mem_requirements{};
-    vkGetImageMemoryRequirements(g_device->handle(), _image, &mem_requirements);
+    vkGetImageMemoryRequirements(_device->handle(), _image, &mem_requirements);
 
     _memory = vk_device_memory{
-        mem_requirements.size,
-        g_device->find_memory_type_index(mem_requirements.memoryTypeBits, properties)
+        *_device, mem_requirements.size,
+        _device->find_memory_type_index(mem_requirements.memoryTypeBits, properties)
     };
-    vkBindImageMemory(g_device->handle(), _image, _memory.handle(), 0); // NOTE : no offset
+    vkBindImageMemory(_device->handle(), _image, _memory.handle(), 0); // NOTE : no offset
 }
 
 vk_image::~vk_image() {
-    vkDestroyImage(g_device->handle(), _image, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyImage(_device->handle(), _image, null_alloc);
+    }
 }
 
 vk_image& vk_image::operator=(vk_image&& oth) {
     // destroy
-    vkDestroyImage(g_device->handle(), _image, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyImage(_device->handle(), _image, null_alloc);
+    }
     // move
+    _device = oth._device;
     _image = oth._image;
     _memory = std::move(oth._memory);
     _extent = oth._extent;
     _mip_levels = oth._mip_levels;
     _format = oth._format;
     // null
-    oth._image = VK_NULL_HANDLE;
+    oth._device = nullptr;
     return *this;
 }
 

@@ -15,7 +15,8 @@ set(VKW_SOURCES
     vkw/cmd/cmdpool.cpp
     vkw/desc/desclayout.cpp
     vkw/desc/descpool.cpp
-    vkw/device/defconf.cpp
+    vkw/desc/desc_superpool.cpp
+    vkw/device/vk_functions.cpp
     vkw/device/device.cpp
     vkw/device/instance.cpp
     vkw/device/surface.cpp
@@ -30,11 +31,7 @@ set(WINDOW_SOURCES
     window/window.cpp)
 
 set(GRAPHICS_SOURCES
-    graphics/desc_pool_pool.cpp
-    graphics/dryprogram.cpp
-    graphics/grinstance.cpp
-    graphics/renderer.cpp
-    graphics/resman.cpp)
+    graphics/renderer.cpp)
 
 set(ASSET_SOURCES
     asset/filesys.cpp

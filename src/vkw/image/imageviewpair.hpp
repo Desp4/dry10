@@ -7,15 +7,15 @@
 #include "imageview.hpp"
 
 namespace dry::vkw {
-
+// TODO : duplicat device ptr
 class vk_image_view_pair {
 public:
-    vk_image_view_pair(
+    vk_image_view_pair(const vk_device& device,
         VkExtent2D dimensions, u32_t mip_lvls, VkSampleCountFlagBits samples,
         VkFormat img_format, VkImageTiling tiling, VkImageUsageFlags usage,
         VkMemoryPropertyFlags properties, VkImageAspectFlags aspect_flags) :
-        _image{ dimensions, mip_lvls, samples, img_format, tiling, usage, properties },
-        _view{ _image.handle(), img_format, mip_lvls, aspect_flags }
+        _image{ device, dimensions, mip_lvls, samples, img_format, tiling, usage, properties },
+        _view{ device, _image.handle(), img_format, mip_lvls, aspect_flags }
     {}
 
     vk_image_view_pair() = default;

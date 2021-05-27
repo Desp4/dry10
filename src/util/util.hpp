@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef DRY_UTIL_UTIL_H
+#define DRY_UTIL_UTIL_H
+
 #include <utility>
 #include "util/num.hpp"
 
@@ -65,3 +68,5 @@ struct nullable_ptr : nullable_primitive<T*, nullptr> {
 };
 
 }
+
+#endif

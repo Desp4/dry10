@@ -12,7 +12,7 @@ namespace dry::vkw {
 
 class vk_pipeline_graphics {
 public:
-    vk_pipeline_graphics(
+    vk_pipeline_graphics(const vk_device& device,
         const vk_render_pass& pass, VkExtent2D extent, std::span<const vk_shader_module> modules,
         const asset::vk_shader_data& shader_data, std::span<const VkDescriptorSetLayout> layouts
     );
@@ -23,11 +23,13 @@ public:
     ~vk_pipeline_graphics();
 
     void bind_pipeline(VkCommandBuffer buf) const;
-    void bind_descriptor_sets(VkCommandBuffer buf, std::span<const VkDescriptorSet> sets) const;
+
+    VkPipelineLayout layout() const { return _pipeline_layout; }
 
     vk_pipeline_graphics& operator=(vk_pipeline_graphics&&);
 
 private:
+    const vk_device* _device = nullptr;
     VkPipelineLayout _pipeline_layout = VK_NULL_HANDLE;
     VkPipeline _pipeline = VK_NULL_HANDLE;
     // TODO : need extent and render_pass on reconstruction at say window resize

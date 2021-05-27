@@ -1,12 +1,11 @@
 #include "pipeline_g.hpp"
 
-#include "device/g_device.hpp"
-
 namespace dry::vkw {
 
-vk_pipeline_graphics::vk_pipeline_graphics(
+vk_pipeline_graphics::vk_pipeline_graphics(const vk_device& device,
     const vk_render_pass& pass, VkExtent2D extent, std::span<const vk_shader_module> modules,
-    const asset::vk_shader_data& shader_data, std::span<const VkDescriptorSetLayout> layouts)
+    const asset::vk_shader_data& shader_data, std::span<const VkDescriptorSetLayout> layouts) :
+    _device{ &device }
 {
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
     shader_stages.reserve(modules.size());
@@ -23,13 +22,13 @@ vk_pipeline_graphics::vk_pipeline_graphics(
         shader_stages.push_back(shader_stage);
     }
 
-    VkPipelineVertexInputStateCreateInfo vertex_input_info{};
+    VkPipelineVertexInputStateCreateInfo vertex_input_info{};   
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input_info.vertexBindingDescriptionCount = 1;
     vertex_input_info.pVertexBindingDescriptions = &shader_data.vertex_binding;
     vertex_input_info.vertexAttributeDescriptionCount = static_cast<u32_t>(shader_data.vertex_descriptors.size());
     vertex_input_info.pVertexAttributeDescriptions = shader_data.vertex_descriptors.data();
-
+    
     VkPipelineInputAssemblyStateCreateInfo assembly_info{};
     assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -61,7 +60,7 @@ vk_pipeline_graphics::vk_pipeline_graphics(
     raster_info.polygonMode = VK_POLYGON_MODE_FILL;
     raster_info.lineWidth = 1.0f;
     raster_info.cullMode = VK_CULL_MODE_BACK_BIT;
-    raster_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    raster_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
     raster_info.depthBiasEnable = VK_FALSE;
     raster_info.depthBiasConstantFactor = 0.0f;
     raster_info.depthBiasClamp = 0.0f;
@@ -117,7 +116,7 @@ vk_pipeline_graphics::vk_pipeline_graphics(
     pipeline_layout_info.setLayoutCount = static_cast<u32_t>(layouts.size());
     pipeline_layout_info.pSetLayouts = layouts.data();
     pipeline_layout_info.pushConstantRangeCount = 0;
-    vkCreatePipelineLayout(g_device->handle(), &pipeline_layout_info, null_alloc, &_pipeline_layout);
+    vkCreatePipelineLayout(_device->handle(), &pipeline_layout_info, null_alloc, &_pipeline_layout);
 
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -138,35 +137,32 @@ vk_pipeline_graphics::vk_pipeline_graphics(
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE; // assume no recreation
     pipeline_info.basePipelineIndex = -1;
 
-    vkCreateGraphicsPipelines(g_device->handle(), VK_NULL_HANDLE, 1, &pipeline_info, null_alloc, &_pipeline);
+    vkCreateGraphicsPipelines(_device->handle(), VK_NULL_HANDLE, 1, &pipeline_info, null_alloc, &_pipeline);
 }
 
 vk_pipeline_graphics::~vk_pipeline_graphics() {
-    vkDestroyPipeline(g_device->handle(), _pipeline, null_alloc);
-    vkDestroyPipelineLayout(g_device->handle(), _pipeline_layout, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyPipeline(_device->handle(), _pipeline, null_alloc);
+        vkDestroyPipelineLayout(_device->handle(), _pipeline_layout, null_alloc);
+    }
 }
 
 void vk_pipeline_graphics::bind_pipeline(VkCommandBuffer buf) const {
     vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline);
 }
 
-void vk_pipeline_graphics::bind_descriptor_sets(VkCommandBuffer buf, std::span<const VkDescriptorSet> sets) const {
-    vkCmdBindDescriptorSets(
-        buf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline_layout,
-        0, static_cast<u32_t>(sets.size()), sets.data(), 0, nullptr
-    );
-}
-
 vk_pipeline_graphics& vk_pipeline_graphics::operator=(vk_pipeline_graphics&& oth) {
     // destroy
-    vkDestroyPipeline(g_device->handle(), _pipeline, null_alloc);
-    vkDestroyPipelineLayout(g_device->handle(), _pipeline_layout, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyPipeline(_device->handle(), _pipeline, null_alloc);
+        vkDestroyPipelineLayout(_device->handle(), _pipeline_layout, null_alloc);
+    }
     // move
+    _device = oth._device;
     _pipeline = oth._pipeline;
     _pipeline_layout = oth._pipeline_layout;
     // null
-    oth._pipeline = VK_NULL_HANDLE;
-    oth._pipeline_layout = VK_NULL_HANDLE;
+    oth._device = nullptr;
     return *this;
 }
 

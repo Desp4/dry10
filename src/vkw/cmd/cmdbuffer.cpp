@@ -1,10 +1,9 @@
 #include "cmdbuffer.hpp"
 
-#include "vkw/device/g_device.hpp"
-
 namespace dry::vkw {
 
-vk_cmd_buffer::vk_cmd_buffer(const vk_cmd_pool& pool) :
+vk_cmd_buffer::vk_cmd_buffer(const vk_device& device, const vk_cmd_pool& pool) :
+    _device{ &device },
     _pool{ &pool }
 {
     VkCommandBufferAllocateInfo buffer_info{};
@@ -12,12 +11,12 @@ vk_cmd_buffer::vk_cmd_buffer(const vk_cmd_pool& pool) :
     buffer_info.commandPool = _pool->handle();
     buffer_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     buffer_info.commandBufferCount = 1; // TODO : allocating 1, CAN do in batches pls
-    vkAllocateCommandBuffers(g_device->handle(), &buffer_info, &_buffer);
+    vkAllocateCommandBuffers(_device->handle(), &buffer_info, &_buffer);
 }
 
 vk_cmd_buffer::~vk_cmd_buffer() {
-    if (_pool != nullptr) {
-        vkFreeCommandBuffers(g_device->handle(), _pool->handle(), 1, &_buffer); // NOTE : 1 buffer, hardcoded
+    if (_device != nullptr) {
+        vkFreeCommandBuffers(_device->handle(), _pool->handle(), 1, &_buffer); // NOTE : 1 buffer, hardcoded
     }   
 }
 
@@ -30,14 +29,15 @@ void vk_cmd_buffer::begin(VkCommandBufferUsageFlags usage) const {
 
 vk_cmd_buffer& vk_cmd_buffer::operator=(vk_cmd_buffer&& oth) {
     // destroy
-    if (_pool != nullptr) {
-        vkFreeCommandBuffers(g_device->handle(), _pool->handle(), 1, &_buffer);
+    if (_device != nullptr) {
+        vkFreeCommandBuffers(_device->handle(), _pool->handle(), 1, &_buffer);
     }
     // move
+    _device = oth._device;
     _pool = oth._pool;
     _buffer = oth._buffer;
     // null
-    oth._pool = nullptr;
+    oth._device = nullptr;
     return *this;
 }
 

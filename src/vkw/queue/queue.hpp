@@ -10,7 +10,7 @@ namespace dry::vkw {
 // TODO : if doing multiple pools, ring buffers etc need to reflect that or just dump all queue functionality in free functions
 class vk_queue {
 public:
-    vk_queue(u32_t queue_family_index, u32_t queue_index);
+    vk_queue(const vk_device& device, u32_t queue_family_index, u32_t queue_index);
 
     vk_queue() = default;
     vk_queue(vk_queue&& oth) { *this = std::move(oth); }
@@ -24,6 +24,7 @@ public:
     vk_queue& operator=(vk_queue&&);
 
 protected:
+    const vk_device* _device = nullptr; // not needed in base
     VkQueue _queue = VK_NULL_HANDLE;
     vk_cmd_pool _pool;
 };

@@ -23,10 +23,10 @@ struct vk_shader_data {
     std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
 
     std::vector<descriptor_info<VkDescriptorBufferInfo>> buffer_infos;
-    std::vector<descriptor_info<VkDescriptorImageInfo>> comb_sampler_infos;
+    std::vector<descriptor_info<VkDescriptorImageInfo>> comb_sampler_infos; // TODO : info not used, why keep it
 };
 
-vk_shader_data shader_vk_info(const shader_source& shader);
+vk_shader_data shader_vk_info(const shader_source& shader, std::vector<VkDescriptorSetLayoutBinding> exclude);
 
 constexpr VkShaderStageFlagBits shader_vk_stage(shader_stage stage) {
     switch (stage) {

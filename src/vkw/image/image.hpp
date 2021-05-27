@@ -9,7 +9,7 @@ namespace dry::vkw {
 
 class vk_image {
 public:
-    vk_image(
+    vk_image(const vk_device& device,
         VkExtent2D dimensions, u32_t mip_lvls, VkSampleCountFlagBits samples, VkFormat img_format,
         VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties
     );
@@ -26,6 +26,7 @@ public:
     vk_image& operator=(vk_image&&);
 
 private:
+    const vk_device* _device = nullptr;
     VkImage _image = VK_NULL_HANDLE;
     vk_device_memory _memory;
 

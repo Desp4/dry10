@@ -1,4 +1,4 @@
-#include "defconf.hpp"
+#include "vk_functions.hpp"
 
 namespace dry::vkw {
 

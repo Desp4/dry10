@@ -1,10 +1,10 @@
 #include "imageview.hpp"
 
-#include "vkw/device/g_device.hpp"
-
 namespace dry::vkw {
 
-vk_image_view::vk_image_view(VkImage image, VkFormat format, u32_t mip_lvls, VkImageAspectFlags aspect_flags) {
+vk_image_view::vk_image_view(const vk_device& device, VkImage image, VkFormat format, u32_t mip_lvls, VkImageAspectFlags aspect_flags) :
+    _device{ &device }
+{
     VkImageViewCreateInfo view_info{};
     view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     view_info.image = image;
@@ -16,20 +16,25 @@ vk_image_view::vk_image_view(VkImage image, VkFormat format, u32_t mip_lvls, VkI
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
 
-    vkCreateImageView(g_device->handle(), &view_info, null_alloc, &_view);
+    vkCreateImageView(_device->handle(), &view_info, null_alloc, &_view);
 }
 
 vk_image_view::~vk_image_view() {
-    vkDestroyImageView(g_device->handle(), _view, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyImageView(_device->handle(), _view, null_alloc);
+    }    
 }
 
 vk_image_view& vk_image_view::operator=(vk_image_view&& oth) {
     // destroy
-    vkDestroyImageView(g_device->handle(), _view, null_alloc);
+    if (_device != nullptr) {
+        vkDestroyImageView(_device->handle(), _view, null_alloc);
+    }
     // move
+    _device = oth._device;
     _view = oth._view;
     // null
-    oth._view = VK_NULL_HANDLE;
+    oth._device = nullptr;
     return *this;
 }
 

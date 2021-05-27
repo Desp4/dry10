@@ -3,13 +3,13 @@
 #ifndef DRY_VK_MEMORY_H
 #define DRY_VK_MEMORY_H
 
-#include "vkw/vkw.hpp"
+#include "vkw/device/device.hpp"
 
 namespace dry::vkw {
 
 class vk_device_memory {
 public:
-    vk_device_memory(VkDeviceSize size, u32_t memory_type);
+    vk_device_memory(const vk_device& device, VkDeviceSize size, u32_t memory_type);
 
     vk_device_memory() = default;
     vk_device_memory(vk_device_memory&& oth) { *this = std::move(oth); }
@@ -29,6 +29,7 @@ public:
     vk_device_memory& operator=(vk_device_memory&&);
 
 private:
+    const vk_device* _device = nullptr;
     VkDeviceMemory _memory = VK_NULL_HANDLE;
     VkDeviceSize _size = 0;
 };

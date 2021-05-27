@@ -1,13 +1,12 @@
 #include "queue.hpp"
 
-#include "vkw/device/g_device.hpp"
-
 namespace dry::vkw {
 
-vk_queue::vk_queue(u32_t queue_family_index, u32_t queue_index) :
-    _pool{ queue_family_index }
+vk_queue::vk_queue(const vk_device& device, u32_t queue_family_index, u32_t queue_index) :
+    _device{ &device },
+    _pool{ device, queue_family_index }
 {
-    vkGetDeviceQueue(g_device->handle(), queue_family_index, queue_index, &_queue);
+    vkGetDeviceQueue(_device->handle(), queue_family_index, queue_index, &_queue);
 }
 
 void vk_queue::submit_cmd(VkCommandBuffer cmd_buf) const {
@@ -26,9 +25,11 @@ vk_queue& vk_queue::operator=(vk_queue&& oth) {
     // delete
     // don't need to
     // move
+    _device = oth._device;
     _queue = oth._queue;
     _pool = std::move(oth._pool);
     // null
+    oth._device = nullptr;
     oth._queue = VK_NULL_HANDLE; // doing it just for consistentcy, cleaner errors
     return *this;
 }

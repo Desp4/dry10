@@ -10,7 +10,7 @@ namespace dry::vkw {
 // TODO : add recreate option
 class vk_swapchain_present {
 public:
-    vk_swapchain_present(
+    vk_swapchain_present(const vk_device& device,
         VkSurfaceKHR surface, VkExtent2D extent, VkSurfaceTransformFlagBitsKHR transform,
         u32_t min_image_count, VkFormat format, VkColorSpaceKHR color_space, VkPresentModeKHR present_mode
     );
@@ -27,6 +27,7 @@ public:
     vk_swapchain_present& operator=(vk_swapchain_present&&);
 
 private:
+    const vk_device* _device = nullptr;
     VkSwapchainKHR _swapchain = VK_NULL_HANDLE;
 
     std::vector<VkImage> _swap_images;

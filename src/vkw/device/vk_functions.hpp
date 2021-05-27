@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef DRY_VK_DEFCONF_H
-#define DRY_VK_DEFCONF_H
+#ifndef DRY_VK_VK_FUNCTIONS_H
+#define DRY_VK_VK_FUNCTIONS_H
 
 #include <string_view>
 

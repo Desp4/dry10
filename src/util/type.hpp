@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef DRY_UTIL_TYPE_H
+#define DRY_UTIL_TYPE_H
+
 #include <cstdint>
 
 namespace dry::util {
@@ -23,3 +26,5 @@ struct type_id {
 };
 
 }
+
+#endif
