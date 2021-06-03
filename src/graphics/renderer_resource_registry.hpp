@@ -3,6 +3,8 @@
 #ifndef DRY_GR_RENDERER_RESOURCE_REGISTRY_H
 #define DRY_GR_RENDERER_RESOURCE_REGISTRY_H
 
+#include <glm/mat4x4.hpp>
+
 #include "util/sparse_set.hpp"
 
 #include "asset/vk_reflect.hpp"
@@ -23,6 +25,8 @@ constexpr layout_stage_mask_t none = 0x0;
 constexpr layout_stage_mask_t all = 0xFFFFFFFF;
 
 }
+
+using model_transform = glm::mat4;
 
 class renderer_resource_registry {
 public:
@@ -61,6 +65,8 @@ public:
     material_index allocate_material(index_type pipeline, std::span<const index_type> textures);
     renderable_index allocate_renderable(material_index material, index_type mesh);
 
+    void bind_renderable_transform(renderable_index rend, const model_transform& transform);
+
     auto& pipeline_array() { return _pipelines; }
     auto& mesh_array() { return _vertex_buffers; }
     auto& descriptor_array() { return _pipeline_descriptors; }
@@ -68,6 +74,7 @@ public:
 private:
     struct renderable_data {
         std::vector<index_type> buffers;
+        const model_transform* transform_ptr;
         index_type descriptor; // per frame descriptor index
     };
     struct mesh_group {

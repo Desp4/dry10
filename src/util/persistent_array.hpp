@@ -200,7 +200,7 @@ public:
 private:
     template<typename... Args>
     void construct_type(T* whereptr, Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>) {
-        ::new(static_cast<void*>(whereptr)) T(std::forward<Args>(args)...);
+        ::new(static_cast<void*>(whereptr)) T(std::forward<Args>(args)...); // TODO : {} doesn't compile lol, some conversion issue
     }
     template<typename Functor>
     void apply_to_range(Functor functor) {

@@ -66,27 +66,6 @@ void vulkan_renderer::submit_frame() {
     const auto& cmd_buffer = _cmd_buffers[frame_index];
     const auto cmd_buffer_h = cmd_buffer.handle();
 
-    // write buffers here, tmp for testing
-    {
-        glm::vec3 cam_pos{ 0.0f, -6.0f, -10.0f };
-        glm::mat4 view = glm::translate(glm::mat4(1.0f), cam_pos);
-        glm::mat4 proj = glm::perspective(glm::radians(70.0f), 1.0f, 0.1f, 200.0f);
-        proj[1][1] *= -1;
-
-        camera_transform cam_trans{};
-        cam_trans.proj = proj;
-        cam_trans.view = view;
-        cam_trans.viewproj = proj * view;
-        _camera_ubos[frame_index].write(cam_trans);
-
-        glm::mat4 translation = glm::translate(glm::mat4{ 1.0f }, glm::vec3(0.0f, 0.0f, 0.0f));
-        glm::mat4 scale = glm::scale(glm::mat4{ 1.0 }, glm::vec3(0.2f, 0.2f, 0.2f));
-        model_transform model_trans = translation * scale;
-
-        // only writing first one, one object
-        _model_mat_storage[frame_index].write(model_trans);
-    }
-
     vkResetCommandBuffer(cmd_buffer_h, 0);
     _render_pass.start_cmd_pass(cmd_buffer, frame_index);
 
@@ -96,6 +75,23 @@ void vulkan_renderer::submit_frame() {
     const auto& meshes = _resource_reg.mesh_array();
     const auto& descriptors = _resource_reg.descriptor_array();
     constexpr auto null_index = renderer_resource_registry::null_index;
+
+    {
+        glm::vec3 cam_pos{ 0.0f, -5.0f, 0.0f };
+        glm::mat4 view = glm::translate(glm::mat4(1.0f), cam_pos);
+        glm::mat4 proj = glm::perspective(glm::radians(70.0f), 1.0f, 0.1f, 200.0f);
+        proj[1][1] *= -1;
+
+        camera_transform cam_trans{};
+        cam_trans.proj = proj;
+        cam_trans.view = view;
+        cam_trans.viewproj = proj * view;
+        _camera_ubos[frame_index].write(cam_trans);
+    }
+
+    const auto& frame_transforms = _model_mat_storage[frame_index];
+    model_transform* mapped_transforms{};
+    vkMapMemory(_device.handle(), frame_transforms.memory_handle(), 0, frame_transforms.size(), 0, reinterpret_cast<void**>(&mapped_transforms));
 
     for (const auto& pipeline : pipelines) {
         pipeline.pipeline.bind_pipeline(cmd_buffer_h);
@@ -134,6 +130,10 @@ void vulkan_renderer::submit_frame() {
                             2, 1, &(*pipeline_descriptors)[frame_index][renderable.descriptor], 0, nullptr
                         );
                     }
+                    if (renderable.transform_ptr != nullptr) {
+                        mapped_transforms[instance_count] = *renderable.transform_ptr;
+                    }
+
                     vkCmdDrawIndexed(cmd_buffer_h, index_count, 1, 0, 0, instance_count);
                     instance_count += 1;
                 }
@@ -141,6 +141,7 @@ void vulkan_renderer::submit_frame() {
         }
     }
 
+    vkUnmapMemory(_device.handle(), frame_transforms.memory_handle());
 
     vkCmdEndRenderPass(cmd_buffer_h);
     vkEndCommandBuffer(cmd_buffer_h);

@@ -30,6 +30,9 @@ public:
     auto create_renderable(renderer_resource_registry::material_index material, renderer_resource_registry::index_type mesh) {
         return _renderer_reg->allocate_renderable(material, mesh);
     };
+    void bind_renderable_transform(renderer_resource_registry::renderable_index rend, const model_transform& transform) {
+        _renderer_reg->bind_renderable_transform(rend, transform);
+    }
 
 private:
     template<typename Asset>

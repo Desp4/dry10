@@ -24,6 +24,7 @@ public:
     void write(const void* data, VkDeviceSize size) { _memory.write(data, size); }
 
     VkBuffer handle() const { return _buffer; }
+    VkDeviceMemory memory_handle() const { return _memory.handle(); }
     VkDeviceSize size() const { return _true_size; }
 
     vk_buffer& operator=(vk_buffer&&);

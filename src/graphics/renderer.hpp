@@ -93,7 +93,6 @@ private:
         glm::mat4 proj;
         glm::mat4 view;
     };
-    using model_transform = glm::mat4;
 
     static constexpr VkDescriptorSetLayoutBinding _camera_data_layout_binding{
         .binding = 0,

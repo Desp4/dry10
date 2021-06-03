@@ -166,7 +166,7 @@ renderer_resource_registry::renderable_index renderer_resource_registry::allocat
     auto& parent_material = _pipelines[material.pipeline].materials[material.material];
     const auto& shader_data = _pipeline_reflect_datas[material.pipeline];
 
-    renderable_data renderable{ .descriptor = null_index };
+    renderable_data renderable{ .transform_ptr = nullptr, .descriptor = null_index };
     renderable.buffers.reserve(shader_data.buffer_infos.size());
     for (const auto& buffer_info : shader_data.buffer_infos) {
         renderable.buffers.push_back(
@@ -179,7 +179,7 @@ renderer_resource_registry::renderable_index renderer_resource_registry::allocat
     }    
 
     auto mesh_it = std::lower_bound(parent_material.mesh_groups.begin(), parent_material.mesh_groups.end(), mesh,
-        [](auto& elem, auto val) { return elem.mesh == val; }
+        [](auto& elem, auto val) { return elem.mesh < val; }
     );
 
     if (mesh_it == parent_material.mesh_groups.end()) {
@@ -193,6 +193,10 @@ renderer_resource_registry::renderable_index renderer_resource_registry::allocat
     renderable_index ret_rend{ .material = material,.mesh = mesh };
     ret_rend.renderable = static_cast<index_type>(mesh_it->renderables.emplace(std::move(renderable)));
     return ret_rend;
+}
+
+void renderer_resource_registry::bind_renderable_transform(renderable_index rend, const model_transform& transform) {
+    _pipelines[rend.material.pipeline].materials[rend.material.material].mesh_groups[rend.mesh].renderables[rend.renderable].transform_ptr = &transform;
 }
 
 renderer_resource_registry::index_type renderer_resource_registry::allocate_renderable_buffer(VkDescriptorType descriptor_type, VkDeviceSize range, VkDeviceSize offset) {

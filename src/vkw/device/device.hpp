@@ -25,7 +25,8 @@ public:
     ~vk_device();
 
     VkSurfaceCapabilitiesKHR surface_capabilities(VkSurfaceKHR surface) const;
-    VkPhysicalDeviceMemoryProperties memory_properties() const;
+    const VkPhysicalDeviceMemoryProperties& memory_properties() const { return _mem_properties; }
+    VkDeviceSize pad_uniform_size(VkDeviceSize size) const;
     // returns UINT32_MAX on failure
     u32_t find_memory_type_index(u32_t type_filter, VkMemoryPropertyFlags properties) const;
     void wait_on_device() const;
@@ -37,6 +38,9 @@ public:
 private:
     VkDevice _device = VK_NULL_HANDLE;
     VkPhysicalDevice _phys_device = VK_NULL_HANDLE;
+
+    VkPhysicalDeviceMemoryProperties _mem_properties;
+    VkPhysicalDeviceProperties _device_properties;
 };
 
 }

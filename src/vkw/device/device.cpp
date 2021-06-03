@@ -1,5 +1,7 @@
 #include "device.hpp"
 
+#include <cmath>
+
 namespace dry::vkw {
 
 vk_device::vk_device(VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
@@ -26,6 +28,9 @@ vk_device::vk_device(VkPhysicalDevice phys_device, std::span<const queue_info> q
     device_info.enabledExtensionCount = static_cast<u32_t>(extensions.size());
     // layers deprecated, skipping
     vkCreateDevice(_phys_device, &device_info, null_alloc, &_device);
+
+    vkGetPhysicalDeviceMemoryProperties(_phys_device, &_mem_properties);
+    vkGetPhysicalDeviceProperties(_phys_device, &_device_properties);
 }
 
 vk_device::~vk_device() {
@@ -38,17 +43,19 @@ VkSurfaceCapabilitiesKHR vk_device::surface_capabilities(VkSurfaceKHR surface) c
     return ret;
 }
 
-VkPhysicalDeviceMemoryProperties vk_device::memory_properties() const {
-    VkPhysicalDeviceMemoryProperties mem_properties{};
-    vkGetPhysicalDeviceMemoryProperties(_phys_device, &mem_properties);
-    return mem_properties;
+VkDeviceSize vk_device::pad_uniform_size(VkDeviceSize size) const {
+    const auto min_align = _device_properties.limits.minUniformBufferOffsetAlignment;
+    VkDeviceSize aligned = size;
+    if (min_align != 0) {
+        aligned = static_cast<VkDeviceSize>(std::ceilf(static_cast<f32_t>(min_align) / aligned) * min_align);
+    } // Sascha Willems: (alignedSize + minUboAlignment - 1) & ~(minUboAlignment - 1), does same thing, more cryptic
+    return aligned;
 }
 
 u32_t vk_device::find_memory_type_index(u32_t type_filter, VkMemoryPropertyFlags properties) const {
-    const auto mem_properties = memory_properties();
-    for (auto i = 0u; i < mem_properties.memoryTypeCount; ++i) {
+    for (auto i = 0u; i < _mem_properties.memoryTypeCount; ++i) {
         if (type_filter & (1 << i) && properties ==
-            (mem_properties.memoryTypes[i].propertyFlags & properties))
+            (_mem_properties.memoryTypes[i].propertyFlags & properties))
         {
             return i;
         }
@@ -66,6 +73,8 @@ vk_device& vk_device::operator=(vk_device&& oth) {
     // move
     _device = oth._device;
     _phys_device = oth._phys_device;
+    _mem_properties = std::move(oth._mem_properties);
+    _device_properties = std::move(oth._device_properties);
     // null
     oth._device = VK_NULL_HANDLE;
     return *this;
