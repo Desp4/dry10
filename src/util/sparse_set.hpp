@@ -6,7 +6,7 @@
 #include "persistent_array.hpp"
 
 namespace dry {
-
+// TODO : add noexcept
 template<typename T>
 class sparse_set {
 public:
@@ -20,6 +20,9 @@ public:
         _dense.reserve(capacity);
         _sparse_ref.reserve(capacity);
     }
+
+    sparse_set(const sparse_set&) = default;
+    sparse_set(sparse_set&&) = default;
 
     template<typename... Args>
     index_type emplace(Args&&... args) {

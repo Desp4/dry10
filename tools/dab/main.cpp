@@ -148,6 +148,7 @@ static bool probe_shader(zip_t* archive, const fs::path& path) {
         // write to zip
         add_buffer_to_archive(archive, unit_name, buffer.data(), buffer.size());
     }
+    add_buffer_to_archive(archive, path.stem().string() + ".shader", nullptr, 0);
     return true;
 }
 
@@ -224,17 +225,6 @@ static bool probe_mesh(zip_t* archive, const fs::path& path) {
     return true;
 }
 
-static void add_id(zip_t* archive, uint32_t* id) {
-    auto src_buffer = zip_source_buffer(archive, id, sizeof(*id), 0);
-    if (src_buffer == nullptr) {
-        throw std::runtime_error(std::string{ "Failed to add id to archive: " } + zip_strerror(archive));
-    }
-    if (zip_file_add(archive, ".id", src_buffer, ZIP_FL_ENC_GUESS) < 0) {
-        zip_source_free(src_buffer);
-        throw std::runtime_error(std::string{ "Failed to add id to archive: " } + zip_strerror(archive));
-    }
-}
-
 int main(int argc, char** argv) {
     // command line parsing
     if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
@@ -271,7 +261,6 @@ int main(int argc, char** argv) {
             return -1;
         }
         id = static_cast<uint32_t>(id_l);
-        add_id(archive_handle, &id);
     }
     catch(std::exception& ex) {
         std::cerr << "Failed to add id file: " << ex.what() << '\n';

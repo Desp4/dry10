@@ -62,7 +62,9 @@ public:
         _available_capacity = oth._available_capacity;
     }
 
-    persistent_array(persistent_array&& oth) noexcept {
+    persistent_array(persistent_array&& oth) noexcept :
+        persistent_array{}
+    {
         *this = std::move(oth);
     }
 

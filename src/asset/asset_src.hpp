@@ -17,6 +17,10 @@ enum class shader_stage{
     fragment
 };
 
+// hashed type
+using hash_t = u32_t;
+constexpr hash_t null_hash_v = (std::numeric_limits<hash_t>::max)();
+
 // source types
 // TODO : more vertex types
 struct mesh_source {
@@ -46,6 +50,11 @@ struct shader_source {
     std::vector<shader_unit> oth_stages;
 };
 
+struct material_source {
+    hash_t shader;
+    std::vector<hash_t> textures;
+};
+
 // extension lookup
 template<typename>
 struct asset_source_ext {
@@ -65,14 +74,11 @@ struct asset_source_ext<shader_source> {
     static constexpr std::string_view vert_ext = ".vertex.shader";
     static constexpr std::string_view frag_ext = ".fragment.shader";
 
-    static constexpr std::string_view ext = ".0.vertex.shader"; // NOTE : default to vertex, 0 always present
+    static constexpr std::string_view ext = ".shader"; // NOTE : default to vertex, 0 always present
 };
 
 template<typename Asset>
 constexpr std::string_view asset_source_ext_v = asset_source_ext<Asset>::ext;
-
-// hashed type
-using hash_t = u64_t;
 
 template<typename T>
 struct hashed_asset : public T {
@@ -87,6 +93,7 @@ struct hashed_asset : public T {
 using mesh_asset = hashed_asset<mesh_source>;
 using texture_asset = hashed_asset<texture_source>;
 using shader_asset = hashed_asset<shader_source>;
+using material_asset = hashed_asset<material_source>;
 
 }
 

@@ -10,27 +10,9 @@
 #include "dbg/log.hpp"
 
 #include "vkw/device/vk_functions.hpp"
+#include "vk_initers.hpp"
 
 namespace dry {
-
-// TODO : maybe move these two
-static constexpr VkWriteDescriptorSet desc_write_from_binding(VkDescriptorSetLayoutBinding binding) {
-    VkWriteDescriptorSet desc_write{};
-
-    desc_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    desc_write.dstBinding = binding.binding;
-    desc_write.descriptorType = binding.descriptorType;
-    desc_write.descriptorCount = binding.descriptorCount;
-    return desc_write;
-}
-
-static constexpr VkBufferUsageFlags descriptor_type_to_buffer_usage(VkDescriptorType type) {
-    switch (type) {
-    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    default: LOG_ERR("Can't initialize a buffer from this descriptor"); dbg::panic(); // TODO : fmt type into log err
-    }
-}
 
 vulkan_renderer::vulkan_renderer(const wsi::window& window) {
     const auto& instance = vk_instance();
@@ -61,71 +43,20 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
     };
     _render_pass.create_framebuffers(_swapchain.swap_views());
 
+    _resource_reg = renderer_resource_registry{ _device, _render_pass, _graphics_queue, _transfer_queue, _image_count };
+    _resource_reg.set_surface_extent(surface_capabilities.currentExtent);
+
     create_global_descriptors();
-    _buffers.resize(_image_count);
+
+    renderer_resource_registry::stage_descriptor_layout global_desc_layout{ .mask = layout_stage_mask::all };
+    global_desc_layout.layout = _global_descriptor_layout.handle();
+    global_desc_layout.exclude_bindings = { _camera_data_layout_binding, _model_data_layout_binding };
+    _resource_reg.set_descriptor_layout_stages({ &global_desc_layout, 1 });
 
     _cmd_buffers.resize(_image_count);
     for (auto& cmd_buffer : _cmd_buffers) {
         cmd_buffer = vkw::vk_cmd_buffer{ _device, _present_queue.cmd_pool() };
     }
-}
-
-vulkan_renderer::renderable_hash vulkan_renderer::create_renderable(const asset::mesh_asset& mesh, const material_asset& material) {
-    if (!_pipelines.contains(material.shader->hash)) {
-        _pipelines[material.shader->hash] = create_pipeline(*material.shader);
-    }
-    
-    auto& pipeline = _pipelines[material.shader->hash];
-    const material_hash mat_hash{ material };
-    if (!pipeline.materials.contains(mat_hash)) {
-        material_data mat_data;
-        // TODO : textures are bound in order of appearance, validity should also be enforced by material
-        mat_data.texs.reserve(material.textures.size());
-        for (const auto& tex : material.textures) {
-            if (!_samplers.contains(tex->hash)) {
-                _samplers[tex->hash] = create_sampler(*tex);
-            }
-            mat_data.texs.push_back(tex->hash);
-        }
-        mat_data.descriptor = create_material_descriptor(pipeline, mat_data); // TODO : errors if no descriptor to create
-
-        pipeline.materials[mat_hash] = std::move(mat_data);
-    }
-    auto& material_data = pipeline.materials[mat_hash];
-
-    if (!material_data.renderables.contains(mesh.hash)) {
-        if (!_meshes.contains(mesh.hash)) {
-            _meshes[mesh.hash] = create_vertex_buffers(mesh);
-        }
-        material_data.renderables[mesh.hash] = sparse_set<renderable>{};
-    }
-
-    std::vector<buffer_hash> buffer_hs;
-    buffer_hs.reserve(pipeline.shader_data.buffer_infos.size());
-    // assuming all the remaining buffers are per object and per frame
-    for (const auto& buffer_info : pipeline.shader_data.buffer_infos) {
-        buffer_hs.push_back(create_buffer(pipeline.shader_data, buffer_info));
-    }
-
-    renderable new_renderable{};
-    if (buffer_hs.size() != 0) {
-        new_renderable.desc_h = create_renderable_frame_descriptors(pipeline, buffer_hs);
-    }
-    else {
-        new_renderable.desc_h = persistent_index_null;
-    }
-    
-
-    const auto rend_index = material_data.renderables[mesh.hash].emplace(std::move(new_renderable));
-
-    renderable_hash new_renderable_hash;
-    new_renderable_hash.shader = material.shader->hash;
-    new_renderable_hash.material = std::move(mat_hash);
-    new_renderable_hash.mesh = mesh.hash;
-    new_renderable_hash.index = rend_index;
-    
-    _renderable_buffer_map[new_renderable_hash] = std::move(buffer_hs);
-    return new_renderable_hash;
 }
 
 void vulkan_renderer::submit_frame() {
@@ -161,9 +92,16 @@ void vulkan_renderer::submit_frame() {
 
     // recording
     u32_t instance_count = 0;
-    for (const auto& pipeline : _pipelines) {
-        pipeline.second.pipeline.bind_pipeline(cmd_buffer_h);
-        const auto pipeline_layout = pipeline.second.pipeline.layout();
+    const auto& pipelines = _resource_reg.pipeline_array();
+    const auto& meshes = _resource_reg.mesh_array();
+    const auto& descriptors = _resource_reg.descriptor_array();
+    constexpr auto null_index = renderer_resource_registry::null_index;
+
+    for (const auto& pipeline : pipelines) {
+        pipeline.pipeline.bind_pipeline(cmd_buffer_h);
+        const auto pipeline_layout = pipeline.pipeline.layout();
+        // jesus
+        const auto* pipeline_descriptors = pipeline.descriptor_sets != null_index ? &descriptors[pipeline.descriptor_sets].frame_descriptors : nullptr;
 
         // bind global descs TODO : rebinding pipeline should keep descs bound if compatible, possibly doing redundant work
         vkCmdBindDescriptorSets(
@@ -171,26 +109,29 @@ void vulkan_renderer::submit_frame() {
             0, 1, &_global_descriptors[frame_index], 0, nullptr
         );
         // TODO : here and in every buffer need to count in alignment
-        for (const auto& material : pipeline.second.materials) {
+        for (const auto& material : pipeline.materials) {
             // bind material descs
-            vkCmdBindDescriptorSets(
-                cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
-                1, 1, &material.second.descriptor, 0, nullptr
-            );
+            if (material.descriptor != VK_NULL_HANDLE) {
+                vkCmdBindDescriptorSets(
+                    cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
+                    1, 1, &material.descriptor, 0, nullptr
+                );
+            }
 
-            for (const auto& mesh_group : material.second.renderables) {
-                const auto& vertex_buf = _meshes[mesh_group.first];
-                const auto vertex_h = vertex_buf.vertex.handle();
+            for (const auto& mesh_group : material.mesh_groups) {
+                const auto& mesh = meshes[mesh_group.mesh];
+                const auto vertex_h = mesh.vertices.handle();
 
                 vkCmdBindVertexBuffers(cmd_buffer_h, 0, 1, &vertex_h, offsets);
-                vkCmdBindIndexBuffer(cmd_buffer_h, vertex_buf.index.handle(), 0, VK_INDEX_TYPE_UINT32);
+                vkCmdBindIndexBuffer(cmd_buffer_h, mesh.indices.handle(), 0, VK_INDEX_TYPE_UINT32);
 
-                const u32_t index_count = static_cast<u32_t>(vertex_buf.index.size() / sizeof(u32_t));
-                for (const auto& renderable : mesh_group.second) {
-                    if (renderable.desc_h != persistent_index_null) {
+                const u32_t index_count = static_cast<u32_t>(mesh.indices.size() / sizeof(u32_t));
+
+                for (const auto& renderable : mesh_group.renderables) {
+                    if (renderable.descriptor != null_index) {
                         vkCmdBindDescriptorSets(
                             cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
-                            2, 1, &pipeline.second.renderable_descs[frame_index][renderable.desc_h], 0, nullptr
+                            2, 1, &(*pipeline_descriptors)[frame_index][renderable.descriptor], 0, nullptr
                         );
                     }
                     vkCmdDrawIndexed(cmd_buffer_h, index_count, 1, 0, 0, instance_count);
@@ -350,154 +291,6 @@ void vulkan_renderer::create_global_descriptors() {
 
         vkUpdateDescriptorSets(_device.handle(), static_cast<u32_t>(global_desc_writes.size()), global_desc_writes.data(), 0, nullptr);
     }
-}
-
-VkDescriptorSet vulkan_renderer::create_material_descriptor(shader_pipeline& pipeline, const material_data& mat_data) {
-    // TODO : this has to be enforced in some way, missing can be set to fallback though
-    assert(pipeline.shader_data.comb_sampler_infos.size() == mat_data.texs.size());
-    std::vector<VkWriteDescriptorSet> desc_writes;
-    desc_writes.reserve(mat_data.texs.size());
-
-    VkDescriptorSet desc_set = pipeline.descpool.get_descriptor_set();
-    std::vector<VkDescriptorImageInfo> image_infos;
-    image_infos.reserve(mat_data.texs.size());
-
-    for (auto i = 0u; i < mat_data.texs.size(); ++i) {
-        const auto& sampler_info = pipeline.shader_data.comb_sampler_infos[i];
-        auto desc_write = desc_write_from_binding(pipeline.shader_data.layout_bindings[sampler_info.binding_ind]);
-        desc_write.dstSet = desc_set;
-        
-        const auto& sampler = _samplers[mat_data.texs[i]];
-        VkDescriptorImageInfo img_info{};
-        img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        img_info.imageView = sampler.texture.view().handle();
-        img_info.sampler = sampler.sampler.handle();
-
-        image_infos.push_back(std::move(img_info));
-        desc_write.pImageInfo = &image_infos.back();
-
-        desc_writes.push_back(std::move(desc_write));
-    }
-
-    vkUpdateDescriptorSets(_device.handle(), static_cast<u32_t>(desc_writes.size()), desc_writes.data(), 0, nullptr);
-    return desc_set;
-}
-
-persistent_index_type vulkan_renderer::create_renderable_frame_descriptors(shader_pipeline& pipeline, std::span<const buffer_hash> buffers) {
-    assert(buffers.size() == pipeline.shader_data.buffer_infos.size()); // shouldn't happen, just in case
-    std::vector<VkWriteDescriptorSet> desc_writes(buffers.size());
-    for (auto i = 0u; i < buffers.size(); ++i) {
-        desc_writes[i] = desc_write_from_binding(pipeline.shader_data.layout_bindings[pipeline.shader_data.buffer_infos[i].binding_ind]);
-    }
-
-    std::vector<VkDescriptorBufferInfo> buffer_infos(buffers.size());
-    for (auto i = 0u; i < buffers.size(); ++i) {
-        buffer_infos[i] = pipeline.shader_data.buffer_infos[i].info;
-    }
-
-    persistent_index_type ret_ind{};
-    for (auto i = 0u; i < _image_count; ++i) {
-        VkDescriptorSet desc_set{};
-        for (auto j = 0u; j < buffers.size(); ++i) {
-            buffer_infos[j].buffer = _buffers[i][buffers[j]].handle();
-            desc_writes[j].pBufferInfo = &buffer_infos[j];
-            desc_writes[j].dstSet = desc_set;
-        }
-        vkUpdateDescriptorSets(_device.handle(), static_cast<u32_t>(desc_writes.size()), desc_writes.data(), 0, nullptr);
-        ret_ind = pipeline.renderable_descs[i].emplace(desc_set);
-    }
-    return ret_ind;
-}
-
-vulkan_renderer::shader_pipeline vulkan_renderer::create_pipeline(const asset::shader_source& shader) {
-    std::vector<vkw::vk_shader_module> shader_modules;
-    shader_modules.reserve(shader.oth_stages.size() + 1);
-    shader_modules.emplace_back(_device, shader.vert_stage.spirv, asset::shader_vk_stage(shader.vert_stage.stage));
-    for (const auto& shader_stage : shader.oth_stages) {
-        shader_modules.emplace_back(_device, shader_stage.spirv, asset::shader_vk_stage(shader_stage.stage));
-    }
-
-    shader_pipeline new_pipeline;
-    const auto capabilities = _device.surface_capabilities(_surface.handle());
-    new_pipeline.shader_data = asset::shader_vk_info(shader, { _camera_data_layout_binding , _model_data_layout_binding });
-
-    std::vector<VkDescriptorSetLayout> desc_layouts{ _global_descriptor_layout.handle() };
-
-    if (new_pipeline.shader_data.layout_bindings.size() != 0) {
-        new_pipeline.layout = vkw::vk_descriptor_layout{ _device, new_pipeline.shader_data.layout_bindings };
-        desc_layouts.push_back(new_pipeline.layout.handle());
-
-        // deduce pool sizes
-        std::vector<VkDescriptorPoolSize> pool_sizes;
-        if (new_pipeline.shader_data.buffer_infos.size() != 0) {
-            pool_sizes.emplace_back(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, _primary_desc_pool_capacity);
-        }
-        if (new_pipeline.shader_data.comb_sampler_infos.size() != 0) {
-            pool_sizes.emplace_back(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, _primary_desc_pool_capacity);
-        }
-        new_pipeline.descpool = vkw::vk_descriptor_superpool{ _device, pool_sizes, _primary_desc_pool_capacity, new_pipeline.layout.handle() };
-    }   
-
-    new_pipeline.pipeline = vkw::vk_pipeline_graphics{
-        _device, _render_pass, capabilities.currentExtent,
-        shader_modules, new_pipeline.shader_data, desc_layouts
-    };
-
-    new_pipeline.renderable_descs.resize(_image_count);
-    return new_pipeline;
-}
-
-vulkan_renderer::vertex_buffer vulkan_renderer::create_vertex_buffers(const asset::mesh_source& mesh) {
-    vertex_buffer buffer;
-    buffer.index = _transfer_queue.create_local_buffer(mesh.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    buffer.vertex = _transfer_queue.create_local_buffer(mesh.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-    return buffer;
-}
-
-vulkan_renderer::tex_sampler vulkan_renderer::create_sampler(const asset::texture_source& texture) {
-    tex_sampler sampler;
-    const u32_t mip_levels = static_cast<u32_t>(std::log2((std::max)(texture.width, texture.height)));
-
-    vkw::vk_buffer staging_buffer{ _device,
-        texture.pixel_data.size(),
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    };
-    staging_buffer.write(texture.pixel_data);
-
-    sampler.texture = vkw::vk_image_view_pair{ _device,
-        VkExtent2D{ texture.width, texture.height },
-        mip_levels,
-        VK_SAMPLE_COUNT_1_BIT,
-        asset::texture_vk_format(texture),
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT
-    };
-
-    _graphics_queue.transition_image_layout(sampler.texture.image(),
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-    );
-    _transfer_queue.copy_buffer_to_image(staging_buffer.handle(), sampler.texture.image());
-    _graphics_queue.generate_mip_maps(sampler.texture.image());
-
-    sampler.sampler = vkw::vk_tex_sampler{ _device, mip_levels };
-
-    return sampler;
-}
-
-vulkan_renderer::buffer_hash vulkan_renderer::create_buffer(const asset::vk_shader_data& shader_data, const decltype(shader_data.buffer_infos)::value_type& buffer_info) {
-    buffer_hash ret{};
-    for (auto& frame_buffers : _buffers) {
-        ret = frame_buffers.emplace(_device,
-            buffer_info.info.range,
-            descriptor_type_to_buffer_usage(shader_data.layout_bindings[buffer_info.binding_ind].descriptorType),
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT // NOTE : writable -> local and coherent
-        );
-    }
-    return ret;
 }
 
 const vkw::vk_instance& vulkan_renderer::vk_instance() {

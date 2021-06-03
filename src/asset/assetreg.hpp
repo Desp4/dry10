@@ -7,6 +7,7 @@
 #include <any>
 
 #include "util/type.hpp"
+#include "util/persistent_array.hpp"
 #include "filesys.hpp"
 
 namespace dry::asset {
@@ -23,90 +24,149 @@ struct is_hashed_asset<hashed_asset<T>> : std::true_type {
 class asset_registry final {
 public:
     template<class T>
-    using hashmap_pool = std::unordered_map<std::string, T>;
+    using hashmap_pool = std::unordered_map<hash_t, T>;
     template<class T>
     using asset_type_id = util::type_id<T, asset_registry>;
 
     template<typename Asset> requires is_hashed_asset<Asset>::value
+    const Asset& get(hash_t hash);
+    template<typename Asset> requires is_hashed_asset<Asset>::value
     const Asset& get(const std::string& name);
 
+    template<typename Asset> requires is_hashed_asset<Asset>::value
+    void load(hash_t hash);
     template<typename Asset> requires is_hashed_asset<Asset>::value
     void load(const std::string& name);
 
     template<typename Asset> requires is_hashed_asset<Asset>::value
+    void unload(hash_t hash);
+    template<typename Asset> requires is_hashed_asset<Asset>::value
     void unload(const std::string& name);
 
-    void unload_all() {
-        _asset_pools.clear();
-    }
+    template<typename Asset> requires is_hashed_asset<Asset>::value
+    const Asset& create(const typename is_hashed_asset<Asset>::type& init_value);
 
-    // let those two fail, will fill loads with placeholders
-    void load_archive(const std::filesystem::path& path) {
-        _filesys.open_archive(path);
-    }
-    void drop_archive() {
-        _filesys.drop_archive();
-    }
+    void unload_all() { _asset_pools.clear(); }
 
 private:
+    template<typename Asset>
+    void assure_pool_size();
+
     filesystem _filesys;
     // NOTE : not expected to loop through it so just store the base ptr
     std::vector<std::any> _asset_pools;
+    persistent_array<persistent_index_type> _runtime_asset_indices;
+
+    static constexpr hash_t _runtime_hash_flag = 1 << (sizeof(hash_t) * 8 - 1);
 };
 
 
 
 template<typename Asset> requires is_hashed_asset<Asset>::value
-const Asset& asset_registry::get(const std::string& name) {
+const Asset& asset_registry::get(hash_t hash) {
     static const auto t_id = asset_type_id<Asset>::value();
 
-    if (t_id >= _asset_pools.size() || !std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id]).contains(name)) {
-        load<Asset>(name); // NOTE : to avoid logging, meh
+    assure_pool_size<Asset>();
+
+    auto& hashmap = std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id]);
+
+    if (!hashmap.contains(hash)) {
+        if (hash & _runtime_hash_flag) {
+            LOG_ERR("Runtime hash %i not found in registry", hash);
+            dbg::panic(); // TODO : can throw a fallback
+        }
+        else {
+            load<Asset>(hash);
+        }
     }
 
-    return std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id])[name];
+    return std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id])[hash];
+}
+
+template<typename Asset> requires is_hashed_asset<Asset>::value
+const Asset& asset_registry::get(const std::string& name) {
+    using underlying = typename is_hashed_asset<Asset>::type;
+    return get<Asset>(_filesys.compute_hash<underlying>(name));
+}
+
+template<typename Asset> requires is_hashed_asset<Asset>::value
+void asset_registry::load(hash_t hash) {
+    using underlying = typename is_hashed_asset<Asset>::type;
+    static const auto t_id = asset_type_id<Asset>::value();
+
+    if (hash & _runtime_hash_flag) {
+        LOG_ERR("Can't log an asset with a runtime hash %i", hash);
+        dbg::panic();
+    }
+
+    assure_pool_size<Asset>();
+
+    auto& hashmap = std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id]);
+    if (hashmap.contains(hash)) {
+        LOG_INF("Asset with hash %i already loaded in", hash);
+        return;
+    }
+
+    // NOTE : relying on filesystem autoloading block
+    hashmap.insert(std::make_pair(
+        hash, Asset{ _filesys.load_asset<underlying>(hash), hash }
+    ));
 }
 
 template<typename Asset> requires is_hashed_asset<Asset>::value
 void asset_registry::load(const std::string& name) {
     using underlying = typename is_hashed_asset<Asset>::type;
+    load<Asset>(_filesys.compute_hash<underlying>(name));
+}
+
+template<typename Asset> requires is_hashed_asset<Asset>::value
+void asset_registry::unload(hash_t hash) {
+    static const auto t_id = asset_type_id<Asset>::value();
+    if (t_id >= _asset_pools.size()) {
+        LOG_ERR("Attempting to unload asset %i from a not allocated pool", hash);
+        return;
+    }
+
+    auto& hashmap = std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id]);
+    const auto asset_it = hashmap.find(hash);
+    if (asset_it == hashmap.end()) {
+        LOG_ERR("Attempting to unload asset %i that is not present", hash);
+        return;
+    }
+
+    if (hash & _runtime_hash_flag) {
+        _runtime_asset_indices.remove(hash & (~_runtime_hash_flag));
+    }
+
+    hashmap.erase(asset_it);
+}
+
+template<typename Asset> requires is_hashed_asset<Asset>::value
+void asset_registry::unload(const std::string& name) {
+    using underlying = typename is_hashed_asset<Asset>::type;
+    return unload<Asset>(_filesys.compute_hash<underlying>(name));
+}
+
+template<typename Asset> requires is_hashed_asset<Asset>::value
+const Asset& asset_registry::create(const typename is_hashed_asset<Asset>::type& init_value) {
+    static const auto t_id = asset_type_id<Asset>::value();
+
+    const hash_t runtime_hash = _runtime_hash_flag | static_cast<hash_t>(_runtime_asset_indices.emplace(0));
+
+    assure_pool_size<Asset>();
+
+    auto& hashmap = std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id]);
+    return hashmap.insert(std::make_pair(runtime_hash, Asset{ init_value, runtime_hash })).first->second;
+}
+
+template<typename Asset>
+void asset_registry::assure_pool_size() {
     static const auto t_id = asset_type_id<Asset>::value();
 
     if (t_id >= _asset_pools.size()) {
         _asset_pools.resize(t_id + 1);
         _asset_pools[t_id] = hashmap_pool<Asset>{};
     }
-
-    auto& hashmap = std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id]);
-    if (hashmap.contains(name)) {
-        LOG_INF("Asset %s already loaded in", name.data());
-        return;
-    }
-
-    // NOTE : relying on filesystem autoloading block
-    hashmap.insert(std::make_pair(
-        name, Asset{ _filesys.load_asset<underlying>(name), _filesys.compute_hash<underlying>(name) }
-    ));
-    LOG_DBG("Asset %s loaded", name.data());
-}
-
-template<typename Asset> requires is_hashed_asset<Asset>::value
-void asset_registry::unload(const std::string& name) {
-    const auto t_id = asset_type_id<Asset>::value();
-    if (t_id >= _asset_pools.size()) {
-        LOG_ERR("Attempting to unload asset %s from a not allocated pool", name.data());
-        dbg::panic();
-    }
-
-    auto& hashmap = std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id]);
-    const auto asset_it = hashmap.find(name);
-    if (asset_it == hashmap.end()) {
-        LOG_ERR("Attempting to unload asset %s that is not loaded", name.data());
-        dbg::panic();
-    }
-
-    hashmap.erase(asset_it);
-    LOG_DBG("Asset %s unloaded", name.data());
 }
 
 }

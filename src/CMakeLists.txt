@@ -31,10 +31,12 @@ set(WINDOW_SOURCES
     window/window.cpp)
 
 set(GRAPHICS_SOURCES
-    graphics/renderer.cpp)
+    graphics/renderer.cpp
+    graphics/renderer_resource_registry.cpp)
 
 set(ASSET_SOURCES
     asset/filesys.cpp
+    asset/asset_resource_adapter.cpp
     asset/shader_reflect.cpp)
 
 set(UTIL_SOURCES
