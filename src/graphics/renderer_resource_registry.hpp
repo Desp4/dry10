@@ -4,6 +4,7 @@
 #define DRY_GR_RENDERER_RESOURCE_REGISTRY_H
 
 #include <glm/mat4x4.hpp>
+#include <variant>
 
 #include "util/sparse_set.hpp"
 
@@ -28,6 +29,12 @@ constexpr layout_stage_mask_t all = 0xFFFFFFFF;
 
 using model_transform = glm::mat4;
 
+template<typename T>
+struct refcounted_t {
+    T value;
+    u32_t refcount;
+};
+
 class renderer_resource_registry {
 public:
     using index_type = u32_t;
@@ -41,11 +48,23 @@ public:
     struct material_index {
         index_type pipeline;
         index_type material;
+
+        bool operator==(const material_index&) const noexcept = default;
     };
     struct renderable_index {
         material_index material;
         index_type mesh;
         index_type renderable;
+
+        bool operator==(const renderable_index&) const noexcept = default;
+    };
+    enum class resource_type {
+        pipeline, material, mesh, texture
+    };
+
+    struct deletion_info {
+        std::variant<index_type, material_index> index;
+        resource_type type;
     };
 
     renderer_resource_registry() = default;
@@ -58,14 +77,17 @@ public:
     void set_descriptor_layout_stages(std::span<const stage_descriptor_layout> stage_layouts);
     void set_surface_extent(VkExtent2D extent); // TODO : can do a recreate on all pipelines if that happens
     // TODO : stage mask is for including specific stages
-    index_type allocate_pipeline(const asset::shader_source& shader, layout_stage_mask_t stage_mask = layout_stage_mask::all);
+    index_type allocate_pipeline(const asset::shader_source& shader);
     index_type allocate_vertex_buffer(const asset::mesh_source& mesh); // TODO : assuming {vec3 pos, vec2 uv}, need shader to deduce properly
     index_type allocate_texture(const asset::texture_source& texture);
 
     material_index allocate_material(index_type pipeline, std::span<const index_type> textures);
     renderable_index allocate_renderable(material_index material, index_type mesh);
+    std::vector<deletion_info> destroy_renderable(renderable_index rend);
 
     void bind_renderable_transform(renderable_index rend, const model_transform& transform);
+
+    void advance_frame();
 
     auto& pipeline_array() { return _pipelines; }
     auto& mesh_array() { return _vertex_buffers; }
@@ -132,6 +154,34 @@ private:
     // buffers
     std::vector<persistent_array<vkw::vk_buffer>> _per_frame_buffers;
 
+    // refcount arrays for vertex buffers and textures
+    persistent_array<u32_t> _vertex_buffer_refcount;
+    persistent_array<u32_t> _texture_refcount;
+
+    // TODO : move deletion queue to some DeleterPolicy or something
+    using deleted_texture = texture_data;
+    using deleted_vertex_buffer = vertex_data;
+    struct deleted_renderable {
+        std::vector<index_type> buffers;
+        index_type descriptor;
+        index_type descriptor_pool;
+    };
+    struct deleted_material {
+        VkDescriptorSet descriptor;
+        index_type descriptor_pool;
+    };
+    struct deleted_pipeline {
+        vkw::vk_pipeline_graphics pipeline;
+        // layot and sets not shared between pipelines, will delete them too
+        index_type layout;
+        index_type descriptor_sets;
+    };
+
+    std::vector<std::vector<deleted_renderable>> _deleted_renderables;
+    std::vector<std::vector<deleted_texture>> _deleted_textures;
+    std::vector<std::vector<deleted_vertex_buffer>> _deleted_vertex_buffers;
+    std::vector<std::vector<deleted_material>> _deleted_materials;
+    std::vector<std::vector<deleted_pipeline>> _deleted_pipelines;
 
     static constexpr u32_t _target_descriptor_pool_capacity = 128;
 };

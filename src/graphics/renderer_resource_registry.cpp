@@ -15,7 +15,12 @@ renderer_resource_registry::renderer_resource_registry(
     _graphics_queue{ &graphics_queue },
     _transfer_queue{ &transfer_queue },
     _image_count{ image_count },
-    _per_frame_buffers(_image_count)
+    _per_frame_buffers(_image_count),
+    _deleted_renderables(_image_count),
+    _deleted_textures(_image_count),
+    _deleted_vertex_buffers(_image_count),
+    _deleted_materials(_image_count),
+    _deleted_pipelines(_image_count)
 {
 }
 
@@ -27,7 +32,9 @@ void renderer_resource_registry::set_surface_extent(VkExtent2D extent) {
     _surface_extent = extent;
 }
 
-renderer_resource_registry::index_type renderer_resource_registry::allocate_pipeline(const asset::shader_source& shader, layout_stage_mask_t stage_mask) {
+renderer_resource_registry::index_type renderer_resource_registry::allocate_pipeline(const asset::shader_source& shader) {
+    const layout_stage_mask_t stage_mask = layout_stage_mask::all; // TODO : const, do nothing
+
     std::vector<vkw::vk_shader_module> shader_modules;
     shader_modules.reserve(shader.oth_stages.size() + 1); // NOTE : assuming vertex present
     shader_modules.emplace_back(*_device, shader.vert_stage.spirv, asset::shader_vk_stage(shader.vert_stage.stage));
@@ -87,6 +94,7 @@ renderer_resource_registry::index_type renderer_resource_registry::allocate_vert
     buffer.indices = _transfer_queue->create_local_buffer(mesh.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     buffer.vertices = _transfer_queue->create_local_buffer(mesh.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
+    _vertex_buffer_refcount.emplace(0);
     return static_cast<index_type>(_vertex_buffers.emplace(std::move(buffer)));
 }
 
@@ -120,6 +128,7 @@ renderer_resource_registry::index_type renderer_resource_registry::allocate_text
 
     sampler.sampler = vkw::vk_tex_sampler{ *_device, mip_levels };
 
+    _texture_refcount.emplace(0);
     return static_cast<index_type>(_textures.emplace(std::move(sampler)));
 }
 
@@ -128,7 +137,7 @@ renderer_resource_registry::material_index renderer_resource_registry::allocate_
     // create material descriptor, checking combined samplers only for now TODO :
     auto& parent_pipeline = _pipelines[pipeline];
     const auto& shader_data = _pipeline_reflect_datas[pipeline];
-
+    // TODO : IMPORTANT assumes pipeline has a descriptor pool, in general this material signature is very rigid
     assert(textures.size() == shader_data.comb_sampler_infos.size());
     if (shader_data.comb_sampler_infos.size() != 0) {
         auto& desc_sets = _pipeline_descriptors[parent_pipeline.descriptor_sets];
@@ -157,6 +166,10 @@ renderer_resource_registry::material_index renderer_resource_registry::allocate_
             desc_writes.push_back(std::move(desc_write));
         }
         vkUpdateDescriptorSets(_device->handle(), static_cast<u32_t>(desc_writes.size()), desc_writes.data(), 0, nullptr);
+    }
+
+    for (auto texture : textures) {
+        _texture_refcount[texture] += 1;
     }
 
     return { pipeline, static_cast<index_type>(parent_pipeline.materials.emplace(std::move(new_material))) };
@@ -190,9 +203,67 @@ renderer_resource_registry::renderable_index renderer_resource_registry::allocat
         mesh_it = parent_material.mesh_groups.insert(mesh_it, mesh_group{ .mesh = mesh });
     }
 
+    _vertex_buffer_refcount[mesh] += 1;
+
     renderable_index ret_rend{ .material = material,.mesh = mesh };
     ret_rend.renderable = static_cast<index_type>(mesh_it->renderables.emplace(std::move(renderable)));
     return ret_rend;
+}
+
+std::vector<renderer_resource_registry::deletion_info> renderer_resource_registry::destroy_renderable(renderable_index rend) {
+    std::vector<deletion_info> delete_info;
+
+    auto& pipeline = _pipelines[rend.material.pipeline];
+    auto& material = pipeline.materials[rend.material.material];
+    auto& mesh_group = material.mesh_groups[rend.mesh];
+    auto& renderable = mesh_group.renderables[rend.renderable];
+
+    _deleted_renderables.back().emplace_back(
+        std::move(renderable.buffers),
+        renderable.descriptor,
+        pipeline.descriptor_sets
+    );
+    mesh_group.renderables.remove(rend.renderable);
+
+    // cascade up, check other resources
+    // 1 layer - mesh
+    if (mesh_group.renderables.size() == 0) {
+        _vertex_buffer_refcount[mesh_group.mesh] -= 1;
+        if (_vertex_buffer_refcount[mesh_group.mesh] == 0) {
+            _deleted_vertex_buffers.back().emplace_back(std::move(_vertex_buffers[mesh_group.mesh]));
+
+            _vertex_buffers.remove(mesh_group.mesh);
+            _vertex_buffer_refcount.remove(mesh_group.mesh);
+            delete_info.emplace_back(mesh_group.mesh, resource_type::mesh);
+        }
+        material.mesh_groups.erase(material.mesh_groups.begin() + rend.mesh);
+
+        // 2 layer - material & texture
+        if (material.mesh_groups.size() == 0) {
+            for (auto texture : material.textures) {
+                _texture_refcount[texture] -= 1;
+                if (_texture_refcount[texture] == 0) {
+                    _deleted_textures.back().emplace_back(std::move(_textures[texture]));
+
+                    _textures.remove(texture);
+                    _texture_refcount.remove(texture);
+                    delete_info.emplace_back(texture, resource_type::texture);
+                }
+            }
+            _deleted_materials.back().emplace_back(material.descriptor, pipeline.descriptor_sets);
+            pipeline.materials.remove(rend.material.material);
+            delete_info.emplace_back(rend.material.material, resource_type::material);
+
+            // 3 layer - pipeline
+            // TODO : doing for completion, probably don't delete pipelines
+            if (pipeline.materials.size() == 0) {
+                _deleted_pipelines.back().emplace_back(std::move(pipeline.pipeline), pipeline.layout, pipeline.descriptor_sets);
+                _pipelines.remove(rend.material.pipeline);
+                delete_info.emplace_back(rend.material.pipeline, resource_type::pipeline);
+            }
+        }
+    }
+    return delete_info;
 }
 
 void renderer_resource_registry::bind_renderable_transform(renderable_index rend, const model_transform& transform) {
@@ -209,6 +280,52 @@ renderer_resource_registry::index_type renderer_resource_registry::allocate_rend
         ));
     }
     return ret_index;
+}
+
+void renderer_resource_registry::advance_frame() {
+    // TODO : rotate probably a pessimization
+    std::rotate(_deleted_renderables.begin(), _deleted_renderables.begin() + 1, _deleted_renderables.end());
+    std::rotate(_deleted_textures.begin(), _deleted_textures.begin() + 1, _deleted_textures.end());
+    std::rotate(_deleted_vertex_buffers.begin(), _deleted_vertex_buffers.begin() + 1, _deleted_vertex_buffers.end());
+    std::rotate(_deleted_materials.begin(), _deleted_materials.begin() + 1, _deleted_materials.end());
+    std::rotate(_deleted_pipelines.begin(), _deleted_pipelines.begin() + 1, _deleted_pipelines.end());
+
+    // renderables, need manual cleanup
+    for (const auto& rend : _deleted_renderables[0]) {
+        for (const auto buffer : rend.buffers) {
+            for (auto& frame_buffers : _per_frame_buffers) {
+                frame_buffers.remove(buffer);
+            }
+        }
+        
+        if (rend.descriptor != null_index) {
+            auto& pipeline_descs = _pipeline_descriptors[rend.descriptor_pool];
+            for (auto& frame_descs : pipeline_descs.frame_descriptors) {
+                pipeline_descs.pool.return_descriptor_set(frame_descs[rend.descriptor]);
+                frame_descs.remove(rend.descriptor);
+            }
+        }
+    }
+    _deleted_renderables[0].clear();
+    // textures
+    _deleted_textures[0].clear();
+    // vertex buffers
+    _deleted_vertex_buffers[0].clear();
+    // materials, manual cleanup
+    for (const auto& material : _deleted_materials[0]) {
+        _pipeline_descriptors[material.descriptor_pool].pool.return_descriptor_set(material.descriptor);
+    }
+    _deleted_materials[0].clear();
+    // pipelines, manual cleanup
+    for (const auto& pipeline : _deleted_pipelines[0]) {
+        if (pipeline.layout != null_index) {
+            _layouts.remove(pipeline.layout);
+        }
+        if (pipeline.descriptor_sets != null_index) {
+            _pipeline_descriptors.remove(pipeline.descriptor_sets);
+        }       
+    }
+    _deleted_pipelines[0].clear();
 }
 
 renderer_resource_registry::index_type renderer_resource_registry::allocate_renderable_descriptor(index_type pipeline, std::span<const index_type> buffers) {

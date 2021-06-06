@@ -66,6 +66,9 @@ void vulkan_renderer::submit_frame() {
     const auto& cmd_buffer = _cmd_buffers[frame_index];
     const auto cmd_buffer_h = cmd_buffer.handle();
 
+    // clear garbage in registry
+    _resource_reg.advance_frame();
+
     vkResetCommandBuffer(cmd_buffer_h, 0);
     _render_pass.start_cmd_pass(cmd_buffer, frame_index);
 
