@@ -34,7 +34,7 @@ vk_instance::vk_instance(std::span<const char* const> extensions, const char* na
         debug_info.pfnUserCallback = callback;
 
         instance_info.pNext = &debug_info;
-        instance_info.enabledLayerCount = static_cast<uint32_t>(layers.size());
+        instance_info.enabledLayerCount = static_cast<u32_t>(layers.size());
         instance_info.ppEnabledLayerNames = layers.data();
     }
 
@@ -54,10 +54,12 @@ vk_instance::vk_instance(std::span<const char* const> extensions, const char* na
 }
 
 vk_instance::~vk_instance() {
-    const auto destroy_debugger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-        vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT")
-    );
-    destroy_debugger(_instance, _debugger, null_alloc);
+    if (_instance != VK_NULL_HANDLE && _debugger != VK_NULL_HANDLE) {
+        const auto destroy_debugger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+            vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT")
+            );
+        destroy_debugger(_instance, _debugger, null_alloc);
+    }
     vkDestroyInstance(_instance, null_alloc);
 }
 

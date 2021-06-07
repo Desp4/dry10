@@ -17,7 +17,7 @@ namespace dry {
 vulkan_renderer::vulkan_renderer(const wsi::window& window) {
     const auto& instance = vk_instance();
     _surface = vkw::vk_surface{ instance, window };
-
+    
     const auto phys_device = find_physical_device();
     const auto queue_infos = populate_queue_infos(phys_device);
     _device = vkw::vk_device{ phys_device, queue_infos.device_queue_infos, _device_extensions, _device_features };
@@ -168,7 +168,6 @@ VkPhysicalDevice vulkan_renderer::find_physical_device() {
         LOG_ERR("No suitable physical device found to initialize vulkan");
         dbg::panic();
     }
-
     return *device_it;
 }
 
@@ -298,6 +297,7 @@ void vulkan_renderer::create_global_descriptors() {
 }
 
 const vkw::vk_instance& vulkan_renderer::vk_instance() {
+#ifdef VKW_ENABLE_DEBUG
     static constexpr std::array<const char*, 3> instance_extensions{
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
@@ -307,10 +307,13 @@ const vkw::vk_instance& vulkan_renderer::vk_instance() {
         "VK_LAYER_KHRONOS_validation"
     };
 
-#ifdef VKW_ENABLE_DEBUG
     static const vkw::vk_instance main_instance{ instance_extensions, "dry1 instance", validation_layers, vk_debug_callback };
 #else
-    static const vkw::vk_instance main_instance{ {instance_extensions.data(), 1}, "dry1 instance" };
+    static constexpr std::array<const char*, 2> instance_extensions{
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME // win only TODO:
+    };
+    static const vkw::vk_instance main_instance{ instance_extensions, "dry1 instance" };
 #endif
     return main_instance;
 }
