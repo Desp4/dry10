@@ -7,12 +7,11 @@
 
 #define ZIP_STATIC
 #include <zip.h>
+#define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <tiny_gltf.h>
 #include <shaderc/shaderc.hpp>
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 
 namespace fs = std::filesystem;
 
@@ -21,12 +20,12 @@ static std::vector<std::vector<std::byte>> zip_buffers;
 static void add_buffer_to_archive(zip_t* archive, std::string_view name, void* data, std::uint64_t size) {
     auto src_buffer = zip_source_buffer(archive, data, size, 0);
     if (src_buffer == nullptr) {
-        throw std::runtime_error(std::string{ "Failed to add " } + name.data() + " to archive: " + zip_strerror(archive));
+        throw std::runtime_error{ std::string{ "Failed to add " } + name.data() + " to archive: " + zip_strerror(archive) };
     }
 
     if (zip_file_add(archive, name.data(), src_buffer, ZIP_FL_ENC_GUESS) < 0) {
         zip_source_free(src_buffer);
-        throw std::runtime_error(std::string{ "Failed to add " } + name.data() + " to archive: " + zip_strerror(archive));
+        throw std::runtime_error{ std::string{ "Failed to add " } + name.data() + " to archive: " + zip_strerror(archive) };
     }
     std::cout << name << " added to archive\n";
 }
@@ -34,12 +33,12 @@ static void add_buffer_to_archive(zip_t* archive, std::string_view name, void* d
 static void add_file_to_archive(zip_t* archive, const fs::path& path, const char* extension) {
     auto src_file = zip_source_file(archive, path.string().c_str(), 0, 0);
     if (src_file == nullptr) {
-        throw std::runtime_error("Failed to add " + path.string() + " to archive: " + zip_strerror(archive));
+        throw std::runtime_error{ "Failed to add " + path.string() + " to archive: " + zip_strerror(archive) };
     }
 
     if (zip_file_add(archive, std::string{ path.stem().string() + '.' + extension }.c_str(), src_file, ZIP_FL_ENC_GUESS) < 0) {
         zip_source_free(src_file);
-        throw std::runtime_error("Failed to add " + path.string() + " to archive: " + zip_strerror(archive));
+        throw std::runtime_error{ "Failed to add " + path.string() + " to archive: " + zip_strerror(archive) };
     }
 
     std::cout << path.filename().string() << " added to archive: " << extension << '\n';
@@ -136,7 +135,7 @@ static bool probe_shader(zip_t* archive, const fs::path& path) {
             if (unit_result.GetNumErrors() != 0) {
                 std::cerr << "shaderc compilation error: " << unit_result.GetErrorMessage() << '\n';
             }
-            throw std::runtime_error(std::string{ "Failed to compile " } + pragma_shader_type[unit.kind] + " shader unit in " + path.string());
+            throw std::runtime_error{ std::string{ "Failed to compile " } + pragma_shader_type[unit.kind] + " shader unit in " + path.string() };
         }
 
         zip_buffers.resize(zip_buffers.size() + 1);
@@ -152,13 +151,42 @@ static bool probe_shader(zip_t* archive, const fs::path& path) {
     return true;
 }
 
+template<typename T>
+static std::span<const T> gltf_buffer(const tinygltf::Model& model, std::uint32_t accessor_ind) {
+    const auto& accessor = model.accessors[accessor_ind];
+    const auto& buffer_view = model.bufferViews[accessor.bufferView];
+    const auto& buffer = model.buffers[buffer_view.buffer];
+
+    const T* ptr = reinterpret_cast<const T*>(&buffer.data[buffer_view.byteOffset + accessor.byteOffset]);
+    return { ptr, (accessor.ByteStride(buffer_view) / sizeof(T)) * accessor.count };
+}
+
+template<typename T>
+std::vector<std::uint32_t> cast_range(const tinygltf::Model& model, std::uint32_t accessor) {
+    const auto span = gltf_buffer<T>(model, accessor);
+    if constexpr (std::is_same_v<T, std::uint32_t>) {
+        return { span.begin(), span.end() };
+    }
+    else {
+        std::vector<std::uint32_t> ret;
+        ret.reserve(span.size());
+        for (auto el : span) {
+            ret.push_back(static_cast<std::uint32_t>(el));
+        }
+        return ret;
+    }
+}
+
 // NOTE : only look for meshes, if vertices consider an error
 static bool probe_mesh(zip_t* archive, const fs::path& path) {
+    using namespace tinygltf;
+    Model model;
+    TinyGLTF loader;
+    std::string err;
+    std::string warn;
 
-    Assimp::Importer importer;
-    
-    const aiScene* scene = importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_FlipUVs);
-    if (scene == nullptr) {
+    const auto ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
+    if (!ret) {
         return false;
     }
 
@@ -168,70 +196,60 @@ static bool probe_mesh(zip_t* archive, const fs::path& path) {
     // vertex buffer of float3
     // uv buffers of float2, with leading
 
-    for (auto i = 0u; i < scene->mNumMeshes; ++i) {
+    for (const auto& mesh : model.meshes) {
+        struct vec3 { float x, y, z; };
+        struct vec2 { float x, y; };
+        std::vector<vec3> mesh_pos;
+        std::vector<vec2> mesh_tex;
+
+        for (const auto& primitive : mesh.primitives) {
+            const auto ind_type = model.accessors[primitive.indices].componentType;
+
+            std::vector<std::uint32_t> indices;
+            switch (ind_type) {
+            case 5120: indices = cast_range<std::int8_t>(model, primitive.indices); break;
+            case 5121: indices = cast_range<std::uint8_t>(model, primitive.indices); break;
+            case 5122: indices = cast_range<std::int16_t>(model, primitive.indices); break;
+            case 5123: indices = cast_range<std::uint16_t>(model, primitive.indices); break;
+            case 5125: indices = cast_range<std::uint32_t>(model, primitive.indices); break;
+            default: throw std::runtime_error{ "TODO : gltf parsing, you got error in indices, pls check it out" };
+            }
+
+            const auto pos_buffer = gltf_buffer<vec3>(model, primitive.attributes.at("POSITION"));
+            const auto tex_buffer = gltf_buffer<vec2>(model, primitive.attributes.at("TEXCOORD_0"));
+
+            for (auto ind : indices) {
+                mesh_pos.push_back(pos_buffer[ind]);
+                mesh_tex.push_back(tex_buffer[ind]);
+            }
+        }
+
+        const std::uint64_t vert_count = mesh_pos.size();
+        const std::uint8_t tex_count = 1;
+
         zip_buffers.resize(zip_buffers.size() + 1);
         auto& buffer = zip_buffers.back();
+        buffer.resize(sizeof vert_count + sizeof tex_count + vert_count * sizeof(vec3) + vert_count * tex_count * sizeof(vec2));
 
-        const aiMesh& mesh = *scene->mMeshes[i];
-        const std::uint8_t uv_set_count = mesh.GetNumUVChannels();
-        const std::uint64_t vert_count = mesh.mNumFaces * 3;
-        // NOTE : (???) mNumVerts is NOT accurate, it's less than unique {pos, tex}, so probably just for {pos} in some cases
-        // it works fine on all the models(viking_room, device, granite, building), but breaks on volga for that reason, TODO : figure out why
-
-        buffer.resize(sizeof(std::uint64_t) + sizeof(std::uint8_t) + vert_count * 3 * sizeof(float) + uv_set_count * vert_count * 2 * sizeof(float));
         *reinterpret_cast<std::uint64_t*>(buffer.data()) = vert_count;
-        *reinterpret_cast<std::uint8_t*>(buffer.data() + sizeof(std::uint64_t)) = uv_set_count;
+        *reinterpret_cast<std::uint8_t*>(buffer.data() + sizeof vert_count) = tex_count;
 
-        aiVector3D* buf_v3_it = reinterpret_cast<aiVector3D*>(buffer.data() + sizeof(std::uint64_t) + sizeof(std::uint8_t));
+        auto* dst_ptr = std::copy(mesh_pos.begin(), mesh_pos.end(), reinterpret_cast<vec3*>(buffer.data() + sizeof vert_count + sizeof tex_count));
+        // 1 tex, no iteration TODO
+        std::copy(mesh_tex.begin(), mesh_tex.end(), reinterpret_cast<vec2*>(dst_ptr));
 
-        for (auto j = 0u; j < mesh.mNumFaces; ++j) {
-            if (mesh.mFaces[j].mNumIndices == 3) {
-                *(buf_v3_it++) = mesh.mVertices[mesh.mFaces[j].mIndices[0]];
-                *(buf_v3_it++) = mesh.mVertices[mesh.mFaces[j].mIndices[1]];
-                *(buf_v3_it++) = mesh.mVertices[mesh.mFaces[j].mIndices[2]];
-            }
-            else { // to be safe, assimp is wild
-                throw std::runtime_error(std::string{ "Failed to triangulate mesh " } + mesh.mName.C_Str() + " in " + path.string());
-            }
-        }
-
-        aiVector2D* buf_v2_it = reinterpret_cast<aiVector2D*>(buf_v3_it);
-        for (auto j = 0u; j < uv_set_count; ++j) {
-            const auto num_components = mesh.mNumUVComponents[j];
-            if (num_components > 1) {
-                if (num_components == 3) {
-                    std::cout << "3 uv components present, cutting to 2\n";
-                }
-
-                for (auto k = 0u; k < mesh.mNumFaces; ++k) {
-                    aiVector3D vert_tex = mesh.mTextureCoords[j][mesh.mFaces[k].mIndices[0]];
-                    *(buf_v2_it++) = { vert_tex.x, vert_tex.y };
-
-                    vert_tex = mesh.mTextureCoords[j][mesh.mFaces[k].mIndices[1]];
-                    *(buf_v2_it++) = { vert_tex.x, vert_tex.y };
-
-                    vert_tex = mesh.mTextureCoords[j][mesh.mFaces[k].mIndices[2]];
-                    *(buf_v2_it++) = { vert_tex.x, vert_tex.y };
-                }
-            }
-            else {
-                throw std::runtime_error(std::string{ mesh.mName.C_Str() } + " has 1 uv coordinate component, cannot continue");
-            }
-        }
-
-        add_buffer_to_archive(archive, std::string{ mesh.mName.C_Str() } + ".mesh", buffer.data(), buffer.size());
+        add_buffer_to_archive(archive, mesh.name + ".mesh", buffer.data(), buffer.size());
     }
-
     return true;
 }
 
 int main(int argc, char** argv) {
     // command line parsing
     if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
-        std::cout << "Usage: dab <id> <dirs...> <output>\n";
+        std::cout << "Usage: dab <dirs...> <output>\n";
         return 0;
     }
-    if (argc < 4) {
+    if (argc < 3) {
         std::cerr << "Invalid usage, type --help or -h for commands\n";
         return -1;
     }
@@ -250,26 +268,10 @@ int main(int argc, char** argv) {
         zip_error_init_with_code(&zip_err, errnum);
         std::cerr << "Zip error for output file " << argv[argc - 1] << ": " << zip_error_strerror(&zip_err) << '\n';
         return -1;
-    }
-
-    uint32_t id{};
-    try {
-        unsigned long id_l = std::stoul(argv[1]);
-        if (id_l > 0xFFFFFFFF) {
-            std::cerr << "Failed to add id file: value out of range\n";
-            zip_discard(archive_handle);
-            return -1;
-        }
-        id = static_cast<uint32_t>(id_l);
-    }
-    catch(std::exception& ex) {
-        std::cerr << "Failed to add id file: " << ex.what() << '\n';
-        zip_discard(archive_handle);
-        return -1;
     }  
 
-    argc -= 3;
-    argv += 2;
+    argc -= 2;
+    argv += 1;
 
     // process files
     int total_files = 0;

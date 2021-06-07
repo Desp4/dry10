@@ -3,11 +3,22 @@ include(FetchDeps.cmake)
 
 project(dry-collection)
 
-option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(DRY_BUILD_DAB "Build dab" ON)
+option(DRY_BUILD_DRY1 "Build dry1" ON)
+option(DRY_BUILD_TESTS "Build tests" ON)
 
-set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_find)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake_find)
+
 fetch_all_deps()
 
-add_subdirectory(tools/dab ${PROJECT_BINARY_DIR}/tools/dab)
-add_subdirectory(src ${PROJECT_BINARY_DIR}/dry1)
-add_subdirectory(tests/sandbox ${PROJECT_BINARY_DIR}/tests/sandbox)
+if (DRY_BUILD_DAB)
+    add_subdirectory(tools/dab ${PROJECT_BINARY_DIR}/tools/dab)
+endif()
+
+if (DRY_BUILD_DRY1)
+    add_subdirectory(src ${PROJECT_BINARY_DIR}/dry1)
+endif()
+
+if (DRY_BUILD_TESTS)
+    add_subdirectory(tests/sandbox ${PROJECT_BINARY_DIR}/tests/sandbox)
+endif()

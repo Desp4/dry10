@@ -55,5 +55,5 @@ target_link_libraries(dry1 PUBLIC
     glfw
     glm
     zip
-    stb
+    stbi
     spirv-cross-core)

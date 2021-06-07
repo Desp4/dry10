@@ -10,6 +10,13 @@ target_include_directories(dry_sandbox PRIVATE "../../src")
 target_link_libraries(dry_sandbox PRIVATE dry1)
 
 add_custom_target(run_sandbox_dab
-    COMMAND dab 0 "${PROJECT_SOURCE_DIR}/assets" "${PROJECT_BINARY_DIR}/assets.zip"
+    COMMAND dab "${PROJECT_SOURCE_DIR}/assets" "${PROJECT_BINARY_DIR}/assets/assets.zip"
     COMMENT "archiving assets for sandbox")
+
+if (NOT EXISTS "${PROJECT_BINARY_DIR}/assets")
+    add_custom_target(create_asset_dir
+        COMMAND mkdir "${PROJECT_SOURCE_DIR}/assets"
+        COMMENT "creating asset directory")
+    add_dependencies(run_sandbox_dab create_asset_dir)
+endif()
 add_dependencies(dry_sandbox run_sandbox_dab)
