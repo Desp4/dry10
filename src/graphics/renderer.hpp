@@ -2,7 +2,7 @@
 
 #ifndef DRY_GR_RENDERER_H
 #define DRY_GR_RENDERER_H
-//#define VKW_ENABLE_DEBUG
+
 #include <array>
 
 #include <glm/mat4x4.hpp>

@@ -26,6 +26,7 @@ constexpr hash_t null_hash_v = (std::numeric_limits<hash_t>::max)();
 struct mesh_source {
     struct vertex {
         glm::vec3 pos;
+        glm::vec3 normal;
         glm::vec2 tex;
     };
 

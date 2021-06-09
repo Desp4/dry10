@@ -56,7 +56,7 @@ function(fetch_libzip)
     export(TARGETS zlibstatic FILE "${CMAKE_CURRENT_BINARY_DIR}/zlibstatic-targets.cmake")
     # replace find module with a dummy, later revert cmake module path
     set(PREV_CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
-    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake_find/hacks)
+    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake/hacks)
 
     message("-- downloading libzip ${LIBZIP_VER}")
     FetchContent_Declare(DEP_LIBZIP
@@ -204,9 +204,15 @@ endfunction()
 
 function(fetch_vulkan)
     if (NOT TARGET vulkan)
-        find_package(vulkan REQUIRED)
-        if(NOT TARGET vulkan)
-            message(FATAL_ERROR "-- Vulkan lib not found, make sure Vulkan SDK is present")
+        if (DEFINED ENV{VULKAN_SDK} AND WIN32)
+            set(VULKAN_INCLUDE "$ENV{VULKAN_SDK}/Include")
+
+            find_library(VULKAN_LIBRARY NAMES vulkan-1 HINTS "$ENV{VULKAN_SDK}/Lib")
+            add_library(vulkan UNKNOWN IMPORTED)
+            set_target_properties(vulkan PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${VULKAN_INCLUDE})
+            set_target_properties(vulkan PROPERTIES IMPORTED_LOCATION ${VULKAN_LIBRARY})
+        else()
+            message(FATAL_ERROR "-- Can't do chief, use windows and vulkan sdk")
         endif()
     endif()
 endfunction()

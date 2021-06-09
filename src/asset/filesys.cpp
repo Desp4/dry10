@@ -120,32 +120,17 @@ mesh_source filesystem::load_asset(hash_t hash) {
         return {};
     }
 
-    const u64_t vert_count = *reinterpret_cast<const u64_t*>(mesh_file->data());
-    const u8_t tex_count = *reinterpret_cast<const u8_t*>(mesh_file->data() + sizeof(u64_t));
-    // TODO : need different vertex types for mesh, as filesystem will shit itself if no tex coord is present
-    std::vector<glm::vec3> vert_pos(vert_count);
-    std::vector<glm::vec2> vert_tex(vert_count);
+    const u64_t ind_count = *reinterpret_cast<const u64_t*>(mesh_file->data());
+    const u64_t vert_count = *reinterpret_cast<const u64_t*>(mesh_file->data() + sizeof(u64_t));
 
-    const std::byte* mesh_it = mesh_file->data() + sizeof(u64_t) + sizeof(u8_t);
+    const std::byte* mesh_it = mesh_file->data() + sizeof(u64_t) * 2;
+    ret_mesh.indices.resize(ind_count);
+    ret_mesh.vertices.resize(vert_count);
 
-    std::copy(mesh_it, mesh_it + vert_count * sizeof(glm::vec3), reinterpret_cast<std::byte*>(vert_pos.data()));
-    mesh_it += vert_count * sizeof(glm::vec3);
-    std::copy(mesh_it, mesh_it + vert_count * sizeof(glm::vec2), reinterpret_cast<std::byte*>(vert_tex.data()));
+    std::copy(mesh_it, mesh_it + ind_count * sizeof(u32_t), reinterpret_cast<std::byte*>(ret_mesh.indices.data()));
+    mesh_it += ind_count * sizeof(u32_t);
+    std::copy(mesh_it, mesh_it + vert_count * sizeof(mesh_source::vertex), reinterpret_cast<std::byte*>(ret_mesh.vertices.data()));
 
-    ret_mesh.indices.reserve(vert_pos.size());
-    std::unordered_map<mesh_source::vertex, u32_t, vertex_hash> unique_verts;
-
-    for (auto i = 0u; i < vert_pos.size(); ++i) {
-        const mesh_source::vertex vertex{ .pos = vert_pos[i], .tex = vert_tex[i] };
-
-        if (!unique_verts.contains(vertex)) {
-            unique_verts[vertex] = static_cast<uint32_t>(ret_mesh.vertices.size());
-            ret_mesh.vertices.push_back(vertex);
-        }
-        ret_mesh.indices.push_back(unique_verts[vertex]);
-    }
-
-    ret_mesh.vertices.shrink_to_fit();
     return ret_mesh;
 }
 

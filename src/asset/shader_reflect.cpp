@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include <spirv_cross/spirv_cross.hpp>
+#include <spirv_cross.hpp>
 
 static constexpr bool operator==(const VkDescriptorSetLayoutBinding& l, const VkDescriptorSetLayoutBinding& r) noexcept {
     return
@@ -114,7 +114,21 @@ vk_shader_data shader_vk_info(const shader_source& shader, std::vector<VkDescrip
     // write input
     u32_t input_stride = 0;
     vk_data.vertex_descriptors.reserve(resources->stage_inputs.size());
+    // NOTE : need to sort to get reliable offsets
+    std::vector<spvc::Resource> stage_inputs;
+    stage_inputs.reserve(resources->stage_inputs.size());
+    auto sort_vert_location_lambda = [&compiler](const spvc::Resource& el, const spvc::Resource& val) {
+        return compiler->get_decoration(el.id, spv::DecorationLocation) < compiler->get_decoration(val.id, spv::DecorationLocation);
+    };
+
     for (const auto& input : resources->stage_inputs) {
+        stage_inputs.insert(
+            std::lower_bound(stage_inputs.begin(), stage_inputs.end(), input, sort_vert_location_lambda),
+            input
+        );
+    }
+
+    for (const auto& input : stage_inputs) {
         const auto& type = compiler->get_type(input.base_type_id);
 
         VkVertexInputAttributeDescription desc{};

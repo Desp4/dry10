@@ -7,8 +7,6 @@ option(DRY_BUILD_DAB "Build dab" ON)
 option(DRY_BUILD_DRY1 "Build dry1" ON)
 option(DRY_BUILD_TESTS "Build tests" ON)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake_find)
-
 fetch_all_deps()
 
 if (DRY_BUILD_DAB)
