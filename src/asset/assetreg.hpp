@@ -20,6 +20,7 @@ struct is_hashed_asset<hashed_asset<T>> : std::true_type {
     using type = T;
 };
 
+
 // NOTE : hash map references have to be persistent
 class asset_registry final {
 public:
@@ -27,7 +28,7 @@ public:
     using hashmap_pool = std::unordered_map<hash_t, T>;
     template<class T>
     using asset_type_id = util::type_id<T, asset_registry>;
-
+    // TODO : string_view overload please
     template<typename Asset> requires is_hashed_asset<Asset>::value
     const Asset& get(hash_t hash);
     template<typename Asset> requires is_hashed_asset<Asset>::value

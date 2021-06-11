@@ -91,7 +91,6 @@ public:
         if (_array != nullptr) {
             if constexpr (std::is_trivially_move_assignable_v<T> && std::is_trivially_destructible_v<T>) {
                 std::copy(_array, _array + _head, new_array);
-                //std::memcpy(new_array, _array, _head * sizeof(union_t));
             }
             else {
                 auto move_lambda = [new_array, this](index_type ind) {

@@ -133,6 +133,7 @@ void vulkan_renderer::submit_frame() {
                             2, 1, &(*pipeline_descriptors)[frame_index][renderable.descriptor], 0, nullptr
                         );
                     }
+
                     if (renderable.transform_ptr != nullptr) {
                         mapped_transforms[instance_count] = *renderable.transform_ptr;
                     }

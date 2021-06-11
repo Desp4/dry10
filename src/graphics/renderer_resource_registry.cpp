@@ -33,7 +33,7 @@ void renderer_resource_registry::set_surface_extent(VkExtent2D extent) {
 }
 
 renderer_resource_registry::index_type renderer_resource_registry::allocate_pipeline(const asset::shader_source& shader) {
-    const layout_stage_mask_t stage_mask = layout_stage_mask::all; // TODO : const, do nothing
+    constexpr layout_stage_mask_t stage_mask = layout_stage_mask::all; // TODO : const, do nothing
 
     std::vector<vkw::vk_shader_module> shader_modules;
     shader_modules.reserve(shader.oth_stages.size() + 1); // NOTE : assuming vertex present
@@ -134,10 +134,10 @@ renderer_resource_registry::index_type renderer_resource_registry::allocate_text
 
 renderer_resource_registry::material_index renderer_resource_registry::allocate_material(index_type pipeline, std::span<const index_type> textures) {
     material_data new_material{ .textures{textures.begin(), textures.end()}, .descriptor = VK_NULL_HANDLE };
-    // create material descriptor, checking combined samplers only for now TODO :
+    // TODO : create material descriptor, checking combined samplers only
     auto& parent_pipeline = _pipelines[pipeline];
     const auto& shader_data = _pipeline_reflect_datas[pipeline];
-    // TODO : IMPORTANT assumes pipeline has a descriptor pool, in general this material signature is very rigid
+    // NOTE : if have textures but pipeline doesn't have a pool - throw the error into the user, its fine
     assert(textures.size() == shader_data.comb_sampler_infos.size());
     if (shader_data.comb_sampler_infos.size() != 0) {
         auto& desc_sets = _pipeline_descriptors[parent_pipeline.descriptor_sets];
@@ -189,23 +189,19 @@ renderer_resource_registry::renderable_index renderer_resource_registry::allocat
 
     if (renderable.buffers.size() != 0) {
         renderable.descriptor = allocate_renderable_descriptor(material.pipeline, renderable.buffers);
-    }    
+    }
 
     auto mesh_it = std::lower_bound(parent_material.mesh_groups.begin(), parent_material.mesh_groups.end(), mesh,
         [](auto& elem, auto val) { return elem.mesh < val; }
     );
 
-    if (mesh_it == parent_material.mesh_groups.end()) {
-        parent_material.mesh_groups.push_back(mesh_group{ .mesh = mesh });
-        mesh_it = parent_material.mesh_groups.begin() + (parent_material.mesh_groups.size() - 1);
-    }
-    else if (mesh_it->mesh != mesh) {
+    if (mesh_it == parent_material.mesh_groups.end() || mesh_it->mesh != mesh) {
         mesh_it = parent_material.mesh_groups.insert(mesh_it, mesh_group{ .mesh = mesh });
     }
 
     _vertex_buffer_refcount[mesh] += 1;
 
-    renderable_index ret_rend{ .material = material,.mesh = mesh };
+    renderable_index ret_rend{ .material = material, .mesh = mesh };
     ret_rend.renderable = static_cast<index_type>(mesh_it->renderables.emplace(std::move(renderable)));
     return ret_rend;
 }
@@ -215,7 +211,9 @@ std::vector<renderer_resource_registry::deletion_info> renderer_resource_registr
 
     auto& pipeline = _pipelines[rend.material.pipeline];
     auto& material = pipeline.materials[rend.material.material];
-    auto& mesh_group = material.mesh_groups[rend.mesh];
+    auto& mesh_group = *std::lower_bound(material.mesh_groups.begin(), material.mesh_groups.end(), rend.mesh,
+        [](auto& elem, auto val) { return elem.mesh < val; }
+    );
     auto& renderable = mesh_group.renderables[rend.renderable];
 
     _deleted_renderables.back().emplace_back(
@@ -224,6 +222,9 @@ std::vector<renderer_resource_registry::deletion_info> renderer_resource_registr
         pipeline.descriptor_sets
     );
     mesh_group.renderables.remove(rend.renderable);
+
+    // TODO : not doing cleanup, need a policy
+    return delete_info;
 
     // cascade up, check other resources
     // 1 layer - mesh
@@ -267,7 +268,11 @@ std::vector<renderer_resource_registry::deletion_info> renderer_resource_registr
 }
 
 void renderer_resource_registry::bind_renderable_transform(renderable_index rend, const model_transform& transform) {
-    _pipelines[rend.material.pipeline].materials[rend.material.material].mesh_groups[rend.mesh].renderables[rend.renderable].transform_ptr = &transform;
+    auto& mesh_groups = _pipelines[rend.material.pipeline].materials[rend.material.material].mesh_groups;
+    auto& mesh_group = *std::lower_bound(mesh_groups.begin(), mesh_groups.end(), rend.mesh,
+        [](auto& elem, auto val) { return elem.mesh < val; }
+    );
+    mesh_group.renderables[rend.renderable].transform_ptr = &transform;
 }
 
 renderer_resource_registry::index_type renderer_resource_registry::allocate_renderable_buffer(VkDescriptorType descriptor_type, VkDeviceSize range, VkDeviceSize offset) {
@@ -313,7 +318,9 @@ void renderer_resource_registry::advance_frame() {
     _deleted_vertex_buffers[0].clear();
     // materials, manual cleanup
     for (const auto& material : _deleted_materials[0]) {
-        _pipeline_descriptors[material.descriptor_pool].pool.return_descriptor_set(material.descriptor);
+        if (material.descriptor_pool != null_index) {
+            _pipeline_descriptors[material.descriptor_pool].pool.return_descriptor_set(material.descriptor);
+        }
     }
     _deleted_materials[0].clear();
     // pipelines, manual cleanup

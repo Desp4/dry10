@@ -35,10 +35,12 @@ public:
         const index_type dense_index = _sparse[index];
         _sparse.remove(index);
 
-        std::swap(_dense[dense_index], _dense.back());
-        std::swap(_sparse_ref[dense_index], _sparse_ref.back());
+        if (dense_index < (_dense.size() - 1)) {
+            std::swap(_dense[dense_index], _dense.back());
+            std::swap(_sparse_ref[dense_index], _sparse_ref.back());
 
-        _sparse[_sparse_ref[dense_index]] = dense_index;
+            _sparse[_sparse_ref[dense_index]] = dense_index;
+        }
 
         _dense.pop_back();
         _sparse_ref.pop_back();

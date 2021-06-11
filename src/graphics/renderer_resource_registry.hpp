@@ -34,7 +34,7 @@ struct refcounted_t {
     T value;
     u32_t refcount;
 };
-
+// TODO : ! don't like binary search for renderable groups AT ALL
 class renderer_resource_registry {
 public:
     using index_type = u32_t;
