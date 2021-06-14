@@ -74,7 +74,7 @@ public:
         u32_t image_count
     );
 
-    void set_descriptor_layout_stages(std::span<const stage_descriptor_layout> stage_layouts);
+    void set_shader_settings(std::span<const stage_descriptor_layout> stage_layouts, std::span<const asset::vertex_input_setting> vertex_inputs);
     void set_surface_extent(VkExtent2D extent); // TODO : can do a recreate on all pipelines if that happens
     // TODO : stage mask is for including specific stages
     index_type allocate_pipeline(const asset::shader_source& shader);
@@ -141,6 +141,7 @@ private:
 
     // pipeline creation descriptor layout
     std::vector<stage_descriptor_layout> _stage_layouts;
+    std::vector<asset::vertex_input_setting> _vertex_inputs;
 
     // pipeline related info
     sparse_set<pipeline_data> _pipelines;

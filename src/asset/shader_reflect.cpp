@@ -104,7 +104,9 @@ static void write_combined_sampler(
 
 }
 
-vk_shader_data shader_vk_info(const shader_source& shader, std::vector<VkDescriptorSetLayoutBinding> exclude) {
+vk_shader_data shader_vk_info(const shader_source& shader,
+    std::vector<VkDescriptorSetLayoutBinding> desc_layout_exclude, std::span<const vertex_input_setting> vertex_input_settings)
+{
     vk_shader_data vk_data;
     // these are too big for a stack, moving to heap
     std::unique_ptr compiler = std::make_unique<const spvc::Compiler>(
@@ -112,7 +114,6 @@ vk_shader_data shader_vk_info(const shader_source& shader, std::vector<VkDescrip
     std::unique_ptr resources = std::make_unique<const spvc::ShaderResources>(compiler->get_shader_resources());
 
     // write input
-    u32_t input_stride = 0;
     vk_data.vertex_descriptors.reserve(resources->stage_inputs.size());
     // NOTE : need to sort to get reliable offsets
     std::vector<spvc::Resource> stage_inputs;
@@ -128,12 +129,32 @@ vk_shader_data shader_vk_info(const shader_source& shader, std::vector<VkDescrip
         );
     }
 
+    u32_t input_stride = 0;
+    auto vert_input_it = vertex_input_settings.begin();
+
     for (const auto& input : stage_inputs) {
         const auto& type = compiler->get_type(input.base_type_id);
 
         VkVertexInputAttributeDescription desc{};
         desc.location = compiler->get_decoration(input.id, spv::DecorationLocation);
-        desc.binding = 0; // NOTE : binding to 0, everywhere
+
+        if (desc.location >= vert_input_it->last_location) {
+            const VkVertexInputBindingDescription binding_desc{
+                .binding = vert_input_it->binding,
+                .stride = input_stride,
+                .inputRate = vert_input_it->input_rate
+            };
+
+            vk_data.vertex_bindings.push_back(binding_desc);
+            ++vert_input_it;
+            if (vert_input_it == vertex_input_settings.end()) {
+                // TODO : if input type occupies multiple locations and is the last one, but last_location is smaller that would result in an error
+                LOG_ERR("Vertex input binding settings exhausted, but input attributes are still left, invalid shader");
+                dbg::panic();
+            }
+        }
+
+        desc.binding = vert_input_it->binding;
         desc.format = vkspv::spir_vkformat(type);
         desc.offset = input_stride;
 
@@ -141,24 +162,32 @@ vk_shader_data shader_vk_info(const shader_source& shader, std::vector<VkDescrip
         vk_data.vertex_descriptors.push_back(desc);
     }
 
-    vk_data.vertex_binding.binding = 0; // NOTE : binding to 0
-    vk_data.vertex_binding.stride = input_stride;
-    vk_data.vertex_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // NOTE : not instance
+    // last vertex binding
+    {
+        const VkVertexInputBindingDescription binding_desc{
+            .binding = vert_input_it->binding,
+            .stride = input_stride,
+            .inputRate = vert_input_it->input_rate
+        };
+        vk_data.vertex_bindings.push_back(binding_desc);
+        // TODO : if not settings not exhausted carry on, maybe shouldn't
+    }
+
 
     // write input uniforms
     const auto vert_stage = shader_vk_stage(shader.vert_stage.stage);
 
     vkspv::write_buffers<VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER>(
         *compiler, resources->uniform_buffers, vert_stage,
-        vk_data.buffer_infos, vk_data.layout_bindings, exclude
+        vk_data.buffer_infos, vk_data.layout_bindings, desc_layout_exclude
     );
     vkspv::write_buffers<VK_DESCRIPTOR_TYPE_STORAGE_BUFFER>(
         *compiler, resources->storage_buffers, vert_stage,
-        vk_data.buffer_infos, vk_data.layout_bindings, exclude
+        vk_data.buffer_infos, vk_data.layout_bindings, desc_layout_exclude
     );
     vkspv::write_combined_sampler(
         *compiler, resources->sampled_images, vert_stage,
-        vk_data.comb_sampler_infos, vk_data.layout_bindings, exclude
+        vk_data.comb_sampler_infos, vk_data.layout_bindings, desc_layout_exclude
     );
 
     // write other stages
@@ -170,18 +199,18 @@ vk_shader_data shader_vk_info(const shader_source& shader, std::vector<VkDescrip
 
         vkspv::write_buffers<VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER>(
             *compiler, resources->uniform_buffers, vert_stage,
-            vk_data.buffer_infos, vk_data.layout_bindings, exclude
+            vk_data.buffer_infos, vk_data.layout_bindings, desc_layout_exclude
         );
         vkspv::write_buffers<VK_DESCRIPTOR_TYPE_STORAGE_BUFFER>(
             *compiler, resources->storage_buffers, vert_stage,
-            vk_data.buffer_infos, vk_data.layout_bindings, exclude
+            vk_data.buffer_infos, vk_data.layout_bindings, desc_layout_exclude
         );
         vkspv::write_combined_sampler(
             *compiler, resources->sampled_images, vk_stage,
-            vk_data.comb_sampler_infos, vk_data.layout_bindings, exclude
+            vk_data.comb_sampler_infos, vk_data.layout_bindings, desc_layout_exclude
         );
     }
-    if (exclude.size() != 0) {
+    if (desc_layout_exclude.size() != 0) {
         LOG_ERR("Exclude layout bindings not exhausted, invalid shader");
         dbg::panic();
     }

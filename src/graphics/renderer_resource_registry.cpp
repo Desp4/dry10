@@ -24,8 +24,11 @@ renderer_resource_registry::renderer_resource_registry(
 {
 }
 
-void renderer_resource_registry::set_descriptor_layout_stages(std::span<const stage_descriptor_layout> stage_layouts) {
+void renderer_resource_registry::set_shader_settings(
+    std::span<const stage_descriptor_layout> stage_layouts, std::span<const asset::vertex_input_setting> vertex_inputs)
+{
     _stage_layouts.assign(stage_layouts.begin(), stage_layouts.end());
+    _vertex_inputs.assign(vertex_inputs.begin(), vertex_inputs.end());
 }
 
 void renderer_resource_registry::set_surface_extent(VkExtent2D extent) {
@@ -54,7 +57,7 @@ renderer_resource_registry::index_type renderer_resource_registry::allocate_pipe
     }
 
     pipeline_data new_pipeline_data;
-    const asset::vk_shader_data shader_data = asset::shader_vk_info(shader, exclude_bindings);
+    const asset::vk_shader_data shader_data = asset::shader_vk_info(shader, exclude_bindings, _vertex_inputs); // TODO : assuming fixed vertex input
     // not empty after exclude warrants a descriptor pool and layout
     if (shader_data.layout_bindings.size() != 0) {
         vkw::vk_descriptor_layout pipeline_desc_layout{ *_device, shader_data.layout_bindings };

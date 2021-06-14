@@ -22,10 +22,10 @@ vk_pipeline_graphics::vk_pipeline_graphics(const vk_device& device,
         shader_stages.push_back(shader_stage);
     }
 
-    VkPipelineVertexInputStateCreateInfo vertex_input_info{};   
+    VkPipelineVertexInputStateCreateInfo vertex_input_info{};
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertex_input_info.vertexBindingDescriptionCount = 1;
-    vertex_input_info.pVertexBindingDescriptions = &shader_data.vertex_binding;
+    vertex_input_info.vertexBindingDescriptionCount = static_cast<u32_t>(shader_data.vertex_bindings.size());
+    vertex_input_info.pVertexBindingDescriptions = shader_data.vertex_bindings.data();
     vertex_input_info.vertexAttributeDescriptionCount = static_cast<u32_t>(shader_data.vertex_descriptors.size());
     vertex_input_info.pVertexAttributeDescriptions = shader_data.vertex_descriptors.data();
     

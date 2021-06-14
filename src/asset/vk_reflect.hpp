@@ -17,7 +17,7 @@ struct vk_shader_data {
         T info;
     };
 
-    VkVertexInputBindingDescription vertex_binding;
+    std::vector<VkVertexInputBindingDescription> vertex_bindings;
     std::vector<VkVertexInputAttributeDescription> vertex_descriptors;
 
     std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
@@ -26,7 +26,14 @@ struct vk_shader_data {
     std::vector<descriptor_info<VkDescriptorImageInfo>> comb_sampler_infos; // TODO : info not used, why keep it
 };
 
-vk_shader_data shader_vk_info(const shader_source& shader, std::vector<VkDescriptorSetLayoutBinding> exclude);
+struct vertex_input_setting {
+    u32_t binding;
+    u32_t last_location; // NOTE TODO : last_location is like end(), is first out of bounds
+    VkVertexInputRate input_rate;
+};
+
+vk_shader_data shader_vk_info(const shader_source& shader,
+    std::vector<VkDescriptorSetLayoutBinding> desc_layout_exclude, std::span<const vertex_input_setting> vertex_input_settings);
 
 constexpr VkShaderStageFlagBits shader_vk_stage(shader_stage stage) {
     switch (stage) {

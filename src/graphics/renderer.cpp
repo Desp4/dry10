@@ -51,7 +51,7 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
     renderer_resource_registry::stage_descriptor_layout global_desc_layout{ .mask = layout_stage_mask::all };
     global_desc_layout.layout = _global_descriptor_layout.handle();
     global_desc_layout.exclude_bindings = { _camera_data_layout_binding, _model_data_layout_binding };
-    _resource_reg.set_descriptor_layout_stages({ &global_desc_layout, 1 });
+    _resource_reg.set_shader_settings({ &global_desc_layout, 1 }, { &_mesh_vertex_input, 1 });
 
     _cmd_buffers.resize(_image_count);
     for (auto& cmd_buffer : _cmd_buffers) {

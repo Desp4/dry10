@@ -108,6 +108,11 @@ private:
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
         .pImmutableSamplers = nullptr
     };
+    static constexpr asset::vertex_input_setting _mesh_vertex_input{
+        .binding = 0,
+        .last_location = 2 + 1, // NOTE : last used 2, 3 is last unused
+        .input_rate = VK_VERTEX_INPUT_RATE_VERTEX
+    };
     static constexpr u32_t _primary_model_mat_storage_size = 4096;
 };
 
