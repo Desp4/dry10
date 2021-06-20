@@ -15,7 +15,8 @@ public:
     vk_queue() = default;
     vk_queue(vk_queue&& oth) { *this = std::move(oth); }
 
-    void submit_cmd(VkCommandBuffer cmd_buf) const;
+    void submit_cmd(VkCommandBuffer cmd_buf, bool wait = true) const;
+    void wait_on_queue() const { vkQueueWaitIdle(_queue); }
 
     // NOTE : need these in renderer for allocating buffers and for swapchain only
     VkQueue handle() const { return _queue; }

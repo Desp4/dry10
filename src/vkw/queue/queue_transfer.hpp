@@ -27,7 +27,7 @@ public:
     }
     vk_buffer create_local_buffer(const void* data, VkDeviceSize size, VkBufferUsageFlags usage) const;
 
-    void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) const;
+    void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size, bool wait = true) const;
     void copy_buffer_to_image(VkBuffer buffer, const vk_image& image) const;
 };
 

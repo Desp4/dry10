@@ -181,8 +181,9 @@ int main() {
     for (auto dt : frame_elapsed_us) {
         total += static_cast<float>(dt);
     }
+    total = total / (frame_elapsed_us.size() * 1000.0f);
 
-    printf("average frame time: %f ms, fps %i\n, cpu elapsed %f ms", total, static_cast<u32_t>(1000.0f / total));
+    printf("average frame time: %f ms, fps %i\n", total, static_cast<u32_t>(1000.0f / total));
 
     return 0;
 }

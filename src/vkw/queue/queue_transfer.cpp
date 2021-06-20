@@ -15,7 +15,7 @@ vk_buffer vk_queue_transfer::create_local_buffer(const void* data, VkDeviceSize 
     return ret_buf;
 }
 
-void vk_queue_transfer::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) const {
+void vk_queue_transfer::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size, bool wait) const {
     vk_cmd_buffer cmd_buf{ *_device, _pool };
     cmd_buf.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -25,7 +25,7 @@ void vk_queue_transfer::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize siz
     copy_region.size = size;
     vkCmdCopyBuffer(cmd_buf.handle(), src, dst, 1, &copy_region);
 
-    submit_cmd(cmd_buf.handle());
+    submit_cmd(cmd_buf.handle(), wait);
 }
 
 void vk_queue_transfer::copy_buffer_to_image(VkBuffer buffer, const vk_image& image) const {

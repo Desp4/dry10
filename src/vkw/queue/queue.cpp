@@ -9,7 +9,7 @@ vk_queue::vk_queue(const vk_device& device, u32_t queue_family_index, u32_t queu
     vkGetDeviceQueue(_device->handle(), queue_family_index, queue_index, &_queue);
 }
 
-void vk_queue::submit_cmd(VkCommandBuffer cmd_buf) const {
+void vk_queue::submit_cmd(VkCommandBuffer cmd_buf, bool wait) const {
     vkEndCommandBuffer(cmd_buf);
 
     VkSubmitInfo submit_info{};
@@ -18,7 +18,9 @@ void vk_queue::submit_cmd(VkCommandBuffer cmd_buf) const {
     submit_info.pCommandBuffers = &cmd_buf;
 
     vkQueueSubmit(_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vkQueueWaitIdle(_queue); // NOTE : waiting here, perhaps not needed in some cases
+    if (wait) {
+        wait_on_queue();
+    }
 }
 
 vk_queue& vk_queue::operator=(vk_queue&& oth) {

@@ -42,9 +42,13 @@ unshaded_pass create_unshaded_pass(const vkw::vk_device& device, const vkw::vk_q
     for (auto i = 0u; i < frame_count; ++i) {
         pass.instance_buffers.emplace_back(
             device, sizeof(unshaded_pass::instance_input) * unshaded_pass::combined_instance_buffer_count,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT // NOTE : local memory
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
     }
+    pass.instance_staging_buffer = vkw::vk_buffer{
+        device, sizeof(unshaded_pass::instance_input) * unshaded_pass::combined_instance_buffer_count,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    };
 
     const std::array desc_pool_sizes = generate_array(layout_bindings, desc_pool_lambda);
     pass.unshaded_descriptor_pool = vkw::vk_descriptor_pool{ device, desc_pool_sizes, frame_count };

@@ -53,6 +53,29 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
 }
 
 void vulkan_renderer::submit_frame() {
+    // pre-sync operations, unshaded instance buffer
+    {
+        unshaded_pass::instance_input* mapped_instances{};
+        vkMapMemory(_device.handle(), _unshaded_pass.instance_staging_buffer.memory_handle(),
+            0, _unshaded_pass.instance_staging_buffer.size(), 0, reinterpret_cast<void**>(&mapped_instances)
+        );
+
+        u32_t object_count = 0;
+        for (const auto& pipeline : _resources.pipelines) {
+            for (const auto& [mesh, renderables] : pipeline.renderables) {
+                for (const auto& renderable : renderables) {
+                    mapped_instances[object_count].transform = *renderable.transform_ptr;
+                    // NOTE : hardcoded pick 1 first as tex
+                    mapped_instances[object_count].tex_index = static_cast<u32_t>(_resources.materials[renderable.material].textures[0]);
+                    object_count += 1;
+                }
+            }
+        }
+
+        vkUnmapMemory(_device.handle(), _unshaded_pass.instance_staging_buffer.memory_handle());
+    }
+
+    // acquire frame
     const auto frame_index = _swapchain.acquire_frame();
     const auto& cmd_buffer = _cmd_buffers[frame_index];
     const auto cmd_buffer_h = cmd_buffer.handle();
@@ -61,6 +84,12 @@ void vulkan_renderer::submit_frame() {
     _render_pass.start_cmd_pass(cmd_buffer, frame_index);
 
     // === unshaded pass ===
+
+    // async
+    _transfer_queue.copy_buffer(
+        _unshaded_pass.instance_staging_buffer.handle(), _unshaded_pass.instance_buffers[frame_index].handle(),
+        _unshaded_pass.instance_staging_buffer.size(), false
+    );
 
     if (_unshaded_pass.texture_update_status[frame_index] == false) {
         update_texture_descriptors(_device, _unshaded_pass, frame_index);
@@ -80,15 +109,10 @@ void vulkan_renderer::submit_frame() {
         _unshaded_pass.camera_transforms[frame_index].write(cam_trans);
     }
 
-    const auto& instance_buffer = _unshaded_pass.instance_buffers[frame_index];
-
-    unshaded_pass::instance_input* mapped_instances{};
-    vkMapMemory(_device.handle(), instance_buffer.memory_handle(), 0, instance_buffer.size(), 0, reinterpret_cast<void**>(&mapped_instances));
-
     u32_t object_count = 0;
     constexpr std::array<VkDeviceSize, 1> offsets{ 0 };
     std::array<VkBuffer, 2> vertex_buffers;
-    vertex_buffers[0] = instance_buffer.handle();
+    vertex_buffers[0] = _unshaded_pass.instance_buffers[frame_index].handle();
 
     for (const auto& pipeline : _resources.pipelines) {
         pipeline.pipeline.bind_pipeline(cmd_buffer_h);
@@ -103,14 +127,6 @@ void vulkan_renderer::submit_frame() {
 
         // local pipeline bind goes here, nothing though currently
         for (const auto& [mesh, renderables] : pipeline.renderables) {
-            const u32_t begin_count = object_count;
-            for (const auto& renderable : renderables) {
-                mapped_instances[object_count].transform = *renderable.transform_ptr;
-                // NOTE : hardcoded pick 1 first as tex
-                mapped_instances[object_count].tex_index = static_cast<u32_t>(_resources.materials[renderable.material].textures[0]);
-                object_count += 1;
-            }
-
             const auto& vertex_buffer = _resources.vertex_buffers[mesh];
             vertex_buffers[1] = vertex_buffer.vertices.handle();
 
@@ -118,15 +134,18 @@ void vulkan_renderer::submit_frame() {
             vkCmdBindIndexBuffer(cmd_buffer_h, vertex_buffer.indices.handle(), 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdDrawIndexed(cmd_buffer_h, static_cast<u32_t>(vertex_buffer.indices.size() / sizeof(u32_t)),
-                static_cast<u32_t>(renderables.size()), 0, 0, begin_count
+                static_cast<u32_t>(renderables.size()), 0, 0, object_count
             );
+            object_count += static_cast<u32_t>(renderables.size());
         }
     }
 
-    vkUnmapMemory(_device.handle(), instance_buffer.memory_handle());
-
     vkCmdEndRenderPass(cmd_buffer_h);
     vkEndCommandBuffer(cmd_buffer_h);
+
+    // sync to async commands
+    _transfer_queue.wait_on_queue();
+
     _swapchain.submit_frame(_present_queue.handle(), frame_index, cmd_buffer_h);
 }
 
