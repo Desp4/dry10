@@ -30,28 +30,21 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
     _image_count = surface_capabilities.maxImageCount == 0 ?
         surface_capabilities.minImageCount + 1 :
         (std::min)(surface_capabilities.minImageCount + 1, surface_capabilities.maxImageCount);
+    _extent = surface_capabilities.currentExtent;
 
     _swapchain = vkw::vk_swapchain_present{
         _device, _surface.handle(),
-        surface_capabilities.currentExtent, surface_capabilities.currentTransform, _image_count,
+        _extent, surface_capabilities.currentTransform, _image_count,
         _primary_image_format, _primary_image_colorspace, _primary_image_present_mode
     };
     _render_pass = vkw::vk_render_pass{
-        _device, surface_capabilities.currentExtent,
+        _device, _extent,
         vkw::render_pass_flags::color | vkw::render_pass_flags::depth | vkw::render_pass_flags::msaa,
         _primary_msaa_sample_count, _primary_image_format, _primary_depth_format
     };
     _render_pass.create_framebuffers(_swapchain.swap_views());
 
-    _resource_reg = renderer_resource_registry{ _device, _render_pass, _graphics_queue, _transfer_queue, _image_count };
-    _resource_reg.set_surface_extent(surface_capabilities.currentExtent);
-
-    create_global_descriptors();
-
-    renderer_resource_registry::stage_descriptor_layout global_desc_layout{ .mask = layout_stage_mask::all };
-    global_desc_layout.layout = _global_descriptor_layout.handle();
-    global_desc_layout.exclude_bindings = { _camera_data_layout_binding, _model_data_layout_binding };
-    _resource_reg.set_shader_settings({ &global_desc_layout, 1 }, { &_mesh_vertex_input, 1 });
+    _unshaded_pass = create_unshaded_pass(_device, _graphics_queue, _image_count);
 
     _cmd_buffers.resize(_image_count);
     for (auto& cmd_buffer : _cmd_buffers) {
@@ -60,92 +53,77 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
 }
 
 void vulkan_renderer::submit_frame() {
-    VkDeviceSize offsets[1]{ 0 };
-
     const auto frame_index = _swapchain.acquire_frame();
     const auto& cmd_buffer = _cmd_buffers[frame_index];
     const auto cmd_buffer_h = cmd_buffer.handle();
 
-    // clear garbage in registry
-    _resource_reg.advance_frame();
-
     vkResetCommandBuffer(cmd_buffer_h, 0);
     _render_pass.start_cmd_pass(cmd_buffer, frame_index);
 
-    // recording
-    u32_t instance_count = 0;
-    const auto& pipelines = _resource_reg.pipeline_array();
-    const auto& meshes = _resource_reg.mesh_array();
-    const auto& descriptors = _resource_reg.descriptor_array();
-    constexpr auto null_index = renderer_resource_registry::null_index;
+    // === unshaded pass ===
 
+    if (_unshaded_pass.texture_update_status[frame_index] == false) {
+        update_texture_descriptors(_device, _unshaded_pass, frame_index);
+    }
+
+    // write camera transform, hardcoded to fixed point
     {
         glm::vec3 cam_pos{ 0.0f, -5.0f, 0.0f };
         glm::mat4 view = glm::translate(glm::mat4(1.0f), cam_pos);
-        glm::mat4 proj = glm::perspective(glm::radians(70.0f), 1.0f, 0.1f, 200.0f);
+        glm::mat4 proj = glm::perspective(glm::radians(70.0f), 1.0f, 0.1f, 8000.0f);
         proj[1][1] *= -1;
 
         camera_transform cam_trans{};
         cam_trans.proj = proj;
         cam_trans.view = view;
         cam_trans.viewproj = proj * view;
-        _camera_ubos[frame_index].write(cam_trans);
+        _unshaded_pass.camera_transforms[frame_index].write(cam_trans);
     }
 
-    const auto& frame_transforms = _model_mat_storage[frame_index];
-    model_transform* mapped_transforms{};
-    vkMapMemory(_device.handle(), frame_transforms.memory_handle(), 0, frame_transforms.size(), 0, reinterpret_cast<void**>(&mapped_transforms));
+    const auto& instance_buffer = _unshaded_pass.instance_buffers[frame_index];
 
-    for (const auto& pipeline : pipelines) {
+    unshaded_pass::instance_input* mapped_instances{};
+    vkMapMemory(_device.handle(), instance_buffer.memory_handle(), 0, instance_buffer.size(), 0, reinterpret_cast<void**>(&mapped_instances));
+
+    u32_t object_count = 0;
+    constexpr std::array<VkDeviceSize, 1> offsets{ 0 };
+    std::array<VkBuffer, 2> vertex_buffers;
+    vertex_buffers[0] = instance_buffer.handle();
+
+    for (const auto& pipeline : _resources.pipelines) {
         pipeline.pipeline.bind_pipeline(cmd_buffer_h);
-        const auto pipeline_layout = pipeline.pipeline.layout();
-        // jesus
-        const auto* pipeline_descriptors = pipeline.descriptor_sets != null_index ? &descriptors[pipeline.descriptor_sets].frame_descriptors : nullptr;
 
-        // bind global descs TODO : rebinding pipeline should keep descs bound if compatible, possibly doing redundant work
-        vkCmdBindDescriptorSets(
-            cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
-            0, 1, &_global_descriptors[frame_index], 0, nullptr
+        // bind unshaded pass descriptors, NOTE : iirc if changing pipelines they stay bound, so redundant possibly?
+        vkCmdBindDescriptorSets(cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline.layout(),
+            0, 1, &_unshaded_pass.unshaded_descriptors[frame_index], 0, nullptr
         );
-        // TODO : here and in every buffer need to count in alignment
-        for (const auto& material : pipeline.materials) {
-            // bind material descs
-            if (material.descriptor != VK_NULL_HANDLE) {
-                vkCmdBindDescriptorSets(
-                    cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
-                    1, 1, &material.descriptor, 0, nullptr
-                );
+
+        // bind unshaded instance buffer, TODO : need to call for every pipeline?
+        vkCmdBindVertexBuffers(cmd_buffer_h, 1, 1, &vertex_buffers[0], offsets.data());
+
+        // local pipeline bind goes here, nothing though currently
+        for (const auto& [mesh, renderables] : pipeline.renderables) {
+            const u32_t begin_count = object_count;
+            for (const auto& renderable : renderables) {
+                mapped_instances[object_count].transform = *renderable.transform_ptr;
+                // NOTE : hardcoded pick 1 first as tex
+                mapped_instances[object_count].tex_index = static_cast<u32_t>(_resources.materials[renderable.material].textures[0]);
+                object_count += 1;
             }
 
-            for (const auto& mesh_group : material.mesh_groups) {
-                const auto& mesh = meshes[mesh_group.mesh];
-                const auto vertex_h = mesh.vertices.handle();
+            const auto& vertex_buffer = _resources.vertex_buffers[mesh];
+            vertex_buffers[1] = vertex_buffer.vertices.handle();
 
-                vkCmdBindVertexBuffers(cmd_buffer_h, 0, 1, &vertex_h, offsets);
-                vkCmdBindIndexBuffer(cmd_buffer_h, mesh.indices.handle(), 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindVertexBuffers(cmd_buffer_h, 0, 1, &vertex_buffers[1], offsets.data());
+            vkCmdBindIndexBuffer(cmd_buffer_h, vertex_buffer.indices.handle(), 0, VK_INDEX_TYPE_UINT32);
 
-                const u32_t index_count = static_cast<u32_t>(mesh.indices.size() / sizeof(u32_t));
-
-                for (const auto& renderable : mesh_group.renderables) {
-                    if (renderable.descriptor != null_index) {
-                        vkCmdBindDescriptorSets(
-                            cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
-                            2, 1, &(*pipeline_descriptors)[frame_index][renderable.descriptor], 0, nullptr
-                        );
-                    }
-
-                    if (renderable.transform_ptr != nullptr) {
-                        mapped_transforms[instance_count] = *renderable.transform_ptr;
-                    }
-
-                    vkCmdDrawIndexed(cmd_buffer_h, index_count, 1, 0, 0, instance_count);
-                    instance_count += 1;
-                }
-            }
+            vkCmdDrawIndexed(cmd_buffer_h, static_cast<u32_t>(vertex_buffer.indices.size() / sizeof(u32_t)),
+                static_cast<u32_t>(renderables.size()), 0, 0, begin_count
+            );
         }
     }
 
-    vkUnmapMemory(_device.handle(), frame_transforms.memory_handle());
+    vkUnmapMemory(_device.handle(), instance_buffer.memory_handle());
 
     vkCmdEndRenderPass(cmd_buffer_h);
     vkEndCommandBuffer(cmd_buffer_h);
@@ -190,7 +168,7 @@ vulkan_renderer::populated_queue_info vulkan_renderer::populate_queue_infos(VkPh
     // NOTE : here is the order, how they will be returned : present, graphics, transfer
     std::array<queue_family_info, 3> family_info_vals{};
     std::vector<queue_family_info*> family_infos{
-            &family_info_vals[0],& family_info_vals[1],& family_info_vals[2]
+            &family_info_vals[0], &family_info_vals[1], &family_info_vals[2]
     };
     // present is special, find without lambda
     family_infos[0]->family_ind = vkw::get_present_index(queue_families, phys_device, _surface.handle());
@@ -242,67 +220,12 @@ vulkan_renderer::populated_queue_info vulkan_renderer::populate_queue_infos(VkPh
     return { std::move(family_info_vals), std::move(queue_infos) };
 }
 
-void vulkan_renderer::create_global_descriptors() {
-    constexpr std::array global_layout_bindings{ _camera_data_layout_binding, _model_data_layout_binding };
-    _global_descriptor_layout = vkw::vk_descriptor_layout{ _device, global_layout_bindings };
-    
-    const std::array global_desc_pool_sizes{
-        VkDescriptorPoolSize{.type = _camera_data_layout_binding.descriptorType, .descriptorCount = _image_count},
-        VkDescriptorPoolSize{.type = _model_data_layout_binding.descriptorType, .descriptorCount = _image_count}
-    };
-    _global_descriptor_pool = vkw::vk_descriptor_pool{ _device, global_desc_pool_sizes, _image_count };
-
-    _global_descriptors.resize(_image_count);
-    _global_descriptor_pool.create_sets(_global_descriptors, _global_descriptor_layout.handle());
-
-    // create model map buffers and camera ubos for each frame and update destriptors
-    _model_mat_storage.reserve(_image_count);
-    _camera_ubos.reserve(_image_count);
-    constexpr VkDeviceSize storage_size = _primary_model_mat_storage_size * sizeof(model_transform);
-
-    std::array global_desc_writes{
-        desc_write_from_binding(_camera_data_layout_binding),
-        desc_write_from_binding(_model_data_layout_binding)
-    };
-
-    for (auto i = 0u; i < _image_count; ++i) {
-        _camera_ubos.emplace_back(
-            _device, sizeof(camera_transform),
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-        );
-        _model_mat_storage.emplace_back(
-            _device, storage_size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-        );
-
-        VkDescriptorBufferInfo camera_buffer_info{};
-        camera_buffer_info.buffer = _camera_ubos.back().handle();
-        camera_buffer_info.range = _camera_ubos.back().size();
-        camera_buffer_info.offset = 0;
-
-        VkDescriptorBufferInfo model_buffer_info{};
-        model_buffer_info.buffer = _model_mat_storage.back().handle();
-        model_buffer_info.range = _model_mat_storage.back().size();
-        model_buffer_info.offset = 0; // TODO : can have one buffer for all frames, just specify an offset
-
-        global_desc_writes[0].dstSet = _global_descriptors[i];
-        global_desc_writes[0].pBufferInfo = &camera_buffer_info;
-
-        global_desc_writes[1].dstSet = _global_descriptors[i];
-        global_desc_writes[1].pBufferInfo = &model_buffer_info;
-
-        vkUpdateDescriptorSets(_device.handle(), static_cast<u32_t>(global_desc_writes.size()), global_desc_writes.data(), 0, nullptr);
-    }
-}
-
 const vkw::vk_instance& vulkan_renderer::vk_instance() {
 #ifdef VKW_ENABLE_DEBUG
     static constexpr std::array<const char*, 3> instance_extensions{
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME // win only TODO:
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME // win only TODO :
     };
     static constexpr std::array<const char*, 1> validation_layers{
         "VK_LAYER_KHRONOS_validation"
@@ -312,7 +235,7 @@ const vkw::vk_instance& vulkan_renderer::vk_instance() {
 #else
     static constexpr std::array<const char*, 2> instance_extensions{
         VK_KHR_SURFACE_EXTENSION_NAME,
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME // win only TODO:
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME // win only TODO :
     };
     static const vkw::vk_instance main_instance{ instance_extensions, "dry1 instance" };
 #endif

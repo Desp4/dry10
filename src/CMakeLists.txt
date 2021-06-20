@@ -32,7 +32,9 @@ set(WINDOW_SOURCES
 
 set(GRAPHICS_SOURCES
     graphics/renderer.cpp
-    graphics/renderer_resource_registry.cpp)
+    graphics/unshaded_pass.cpp
+    graphics/renderer_creates.cpp
+    graphics/vk_initers.cpp)
 
 set(ASSET_SOURCES
     asset/filesys.cpp

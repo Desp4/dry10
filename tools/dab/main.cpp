@@ -102,15 +102,20 @@ int main(int argc, char** argv) {
             const auto extension = entry.path().extension().string();
             for (auto j = 0u; j < asset_type_count; ++j) {
                 if (assure_extensions_lambda(asset_extensions[j], extension)) {
-                    auto ret_file = asset_parsers[j](entry.path());
+                    try {
+                        auto ret_file = asset_parsers[j](entry.path());
 
-                    for (auto& asset : ret_file) {
-                        zip_buffers.push_back(std::move(asset.first));
-                        const auto& last_buffer = zip_buffers.back();
-                        add_buffer_to_archive(archive_handle, asset.second, last_buffer.data(), last_buffer.size());
-                        total_files += 1;
+                        for (auto& asset : ret_file) {
+                            zip_buffers.push_back(std::move(asset.first));
+                            const auto& last_buffer = zip_buffers.back();
+                            add_buffer_to_archive(archive_handle, asset.second, last_buffer.data(), last_buffer.size());
+                            total_files += 1;
+                        }
+                        break;
                     }
-                    break;
+                    catch (const std::runtime_error& err) {
+                        std::cout << err.what() << "\n Failed to add asset, skipping\n";
+                    }
                 }
             }
             // if not added - ignore

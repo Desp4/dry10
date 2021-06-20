@@ -14,7 +14,8 @@ class vk_pipeline_graphics {
 public:
     vk_pipeline_graphics(const vk_device& device,
         const vk_render_pass& pass, VkExtent2D extent, std::span<const vk_shader_module> modules,
-        const asset::vk_shader_data& shader_data, std::span<const VkDescriptorSetLayout> layouts
+        std::span<const VkVertexInputBindingDescription> vertex_bindings, std::span<const VkVertexInputAttributeDescription> vertex_attributes,
+        std::span<const VkDescriptorSetLayout> layouts
     );
 
     vk_pipeline_graphics() = default;

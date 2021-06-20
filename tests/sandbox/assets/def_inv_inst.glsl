@@ -28,9 +28,7 @@ void main()
     mat4 instanceModel = mat4(instanceModel_0, instanceModel_1, instanceModel_2, instanceModel_3);
     mat4 transformMatrix = (cameraData.viewproj * instanceModel);
     gl_Position = transformMatrix * vec4(inPosition, 1.0);
-
     fragUV = inUV;
-    texIndex = instanceTexIndex;
 }
 
 #pragma fragment
@@ -48,5 +46,6 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    outColor = texture(sampler2D(textures[texIndex], texSampler), fragUV);
+    vec4 texColor = texture(sampler2D(textures[texIndex], texSampler), fragUV);
+    outColor = vec4(1.0 - texColor.x, 1.0 - texColor.y, 1.0 - texColor.z, 1.0);
 }

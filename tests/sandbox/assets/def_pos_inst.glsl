@@ -20,8 +20,7 @@ layout(location = 5) in vec4 instanceModel_2;
 layout(location = 6) in vec4 instanceModel_3;
 layout(location = 7) in int instanceTexIndex;
 
-layout(location = 0) out vec2 fragUV;
-layout(location = 1) out int texIndex;
+layout(location = 0) out vec3 vertNormal;
 
 void main()
 {
@@ -29,8 +28,7 @@ void main()
     mat4 transformMatrix = (cameraData.viewproj * instanceModel);
     gl_Position = transformMatrix * vec4(inPosition, 1.0);
 
-    fragUV = inUV;
-    texIndex = instanceTexIndex;
+    vertNormal = inNormal;
 }
 
 #pragma fragment
@@ -41,12 +39,11 @@ void main()
 layout(set = 0, binding = 1) uniform sampler texSampler;
 layout(set = 0, binding = 2) uniform texture2D textures[TEX_ARRAY_SIZE];
 
-layout(location = 0) in vec2 fragUV;
-layout(location = 1) flat in int texIndex;
+layout(location = 0) in vec3 vertNormal;
 
 layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    outColor = texture(sampler2D(textures[texIndex], texSampler), fragUV);
+    outColor = vec4(vertNormal, 1.0);
 }

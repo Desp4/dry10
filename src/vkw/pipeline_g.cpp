@@ -4,7 +4,8 @@ namespace dry::vkw {
 
 vk_pipeline_graphics::vk_pipeline_graphics(const vk_device& device,
     const vk_render_pass& pass, VkExtent2D extent, std::span<const vk_shader_module> modules,
-    const asset::vk_shader_data& shader_data, std::span<const VkDescriptorSetLayout> layouts) :
+    std::span<const VkVertexInputBindingDescription> vertex_bindings, std::span<const VkVertexInputAttributeDescription> vertex_attributes,
+    std::span<const VkDescriptorSetLayout> layouts) :
     _device{ &device }
 {
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
@@ -24,10 +25,10 @@ vk_pipeline_graphics::vk_pipeline_graphics(const vk_device& device,
 
     VkPipelineVertexInputStateCreateInfo vertex_input_info{};
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertex_input_info.vertexBindingDescriptionCount = static_cast<u32_t>(shader_data.vertex_bindings.size());
-    vertex_input_info.pVertexBindingDescriptions = shader_data.vertex_bindings.data();
-    vertex_input_info.vertexAttributeDescriptionCount = static_cast<u32_t>(shader_data.vertex_descriptors.size());
-    vertex_input_info.pVertexAttributeDescriptions = shader_data.vertex_descriptors.data();
+    vertex_input_info.vertexBindingDescriptionCount = static_cast<u32_t>(vertex_bindings.size());
+    vertex_input_info.pVertexBindingDescriptions = vertex_bindings.data();
+    vertex_input_info.vertexAttributeDescriptionCount = static_cast<u32_t>(vertex_attributes.size());
+    vertex_input_info.pVertexAttributeDescriptions = vertex_attributes.data();
     
     VkPipelineInputAssemblyStateCreateInfo assembly_info{};
     assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

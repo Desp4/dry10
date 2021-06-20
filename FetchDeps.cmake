@@ -124,7 +124,7 @@ function(fetch_shaderc)
     if (NOT TARGET SPIRV-Tools)
         if (NOT SPIRV-Headers_SOURCE_DIR) # NOTE : here not a target but a variable
             set(SPIRV_HEADERS_REPO https://github.com/KhronosGroup/SPIRV-Headers.git)
-            set(SPIRV_HEADERS_HASH 85b7e00c7d785962ffe851a177c84353d037dcb6)
+            set(SPIRV_HEADERS_HASH 07f259e68af3a540038fa32df522554e74f53ed5)
             # TODO : installation should work too, need to dance to make it work with spirv tools
             message("-- downloading SPIRV-Headers")
 
@@ -139,7 +139,7 @@ function(fetch_shaderc)
         endif()
 
         set(SPIRV_TOOLS_REPO https://github.com/KhronosGroup/SPIRV-Tools.git)
-        set(SPIRV_TOOLS_VER v2021.1)
+        set(SPIRV_TOOLS_HASH 5dd2f76918bb2d0d67628e338f60f724f3e02e13)
 
         # settings
         set(SKIP_SPIRV_TOOLS_INSTALL ON CACHE INTERNAL "Internal dependency option" FORCE)
@@ -149,7 +149,7 @@ function(fetch_shaderc)
         message("-- downloading SPIRV-Tools ${SPIRV_TOOLS_VER}")
         FetchContent_Declare(DEP_SPIRV_TOOLS
             GIT_REPOSITORY ${SPIRV_TOOLS_REPO}
-            GIT_TAG ${SPIRV_TOOLS_VER})
+            URL_HASH ${SPIRV_TOOLS_HASH})
         FetchContent_MakeAvailable(DEP_SPIRV_TOOLS)
     endif()
 

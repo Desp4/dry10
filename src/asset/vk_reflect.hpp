@@ -9,31 +9,27 @@
 #include "dbg/log.hpp"
 
 namespace dry::asset {
-
+// TODO : don't keep buffer infos at all, don't take excludes and includes, just dump reflection info
 struct vk_shader_data {
-    template<typename T>
-    struct descriptor_info {
-        u32_t binding_ind;
-        T info;
+    struct vertex_binding_info {
+        u32_t stride;
+        u32_t location;
+        VkFormat format;
+    };
+    struct layout_binding_info {
+        u32_t binding;
+        u32_t set;
+        u32_t count;
+        u32_t stride;
+        VkShaderStageFlags stage;
+        VkDescriptorType type;
     };
 
-    std::vector<VkVertexInputBindingDescription> vertex_bindings;
-    std::vector<VkVertexInputAttributeDescription> vertex_descriptors;
-
-    std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
-
-    std::vector<descriptor_info<VkDescriptorBufferInfo>> buffer_infos;
-    std::vector<descriptor_info<VkDescriptorImageInfo>> comb_sampler_infos; // TODO : info not used, why keep it
+    std::vector<vertex_binding_info> vertex_descriptors;
+    std::vector<layout_binding_info> layout_bindings;
 };
 
-struct vertex_input_setting {
-    u32_t binding;
-    u32_t last_location; // NOTE TODO : last_location is like end(), is first out of bounds
-    VkVertexInputRate input_rate;
-};
-
-vk_shader_data shader_vk_info(const shader_source& shader,
-    std::vector<VkDescriptorSetLayoutBinding> desc_layout_exclude, std::span<const vertex_input_setting> vertex_input_settings);
+vk_shader_data shader_vk_info(const shader_source& shader);
 
 constexpr VkShaderStageFlagBits shader_vk_stage(shader_stage stage) {
     switch (stage) {
