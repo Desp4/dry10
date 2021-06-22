@@ -2,20 +2,7 @@
 
 namespace dry::vkw {
 
-vk_buffer vk_queue_transfer::create_local_buffer(const void* data, VkDeviceSize size, VkBufferUsageFlags usage) const {
-    vk_buffer staging_buffer{ *_device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    };
-    staging_buffer.write(data, size);
-
-    vk_buffer ret_buf{ *_device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-    };
-    copy_buffer(staging_buffer.handle(), ret_buf.handle(), size);
-    return ret_buf;
-}
-
-void vk_queue_transfer::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size, bool wait) const {
+void vk_queue_transfer::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) const {
     vk_cmd_buffer cmd_buf{ *_device, _pool };
     cmd_buf.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -25,7 +12,7 @@ void vk_queue_transfer::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize siz
     copy_region.size = size;
     vkCmdCopyBuffer(cmd_buf.handle(), src, dst, 1, &copy_region);
 
-    submit_cmd(cmd_buf.handle(), wait);
+    submit_cmd(cmd_buf.handle(), true);
 }
 
 void vk_queue_transfer::copy_buffer_to_image(VkBuffer buffer, const vk_image& image) const {

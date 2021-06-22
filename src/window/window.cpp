@@ -15,11 +15,11 @@ void init_glfw() {
     const static glfw_dummy dummy{};
 }
 
-window::window() {
+window::window() noexcept {
     init_glfw();
 }
 
-window::window(u32_t width, u32_t height, std::string_view title) : window{} {
+window::window(u32_t width, u32_t height, std::string_view title) noexcept : window{} {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
@@ -42,7 +42,7 @@ void window::set_title(std::string_view title) {
     glfwSetWindowTitle(_window, title.data());
 }
 
-window& window::operator=(window&& oth) {
+window& window::operator=(window&& oth) noexcept {
     // destroy
     glfwDestroyWindow(_window);
     // move

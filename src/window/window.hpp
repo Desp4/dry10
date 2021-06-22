@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef DRY_WINDOW_H
-#define DRY_WINDOW_H
+#ifndef DRY_WINDOW_WINDOW_H
+#define DRY_WINDOW_WINDOW_H
 
 #include <string_view>
 
@@ -13,11 +13,11 @@ namespace dry::wsi {
 
 class window {
 public:
-    window(u32_t width, u32_t height) : window{ width, height, "dry1 instance" } {}
-    window(u32_t width, u32_t height, std::string_view title);
+    window(u32_t width, u32_t height) noexcept : window{ width, height, "dry1 instance" } {}
+    window(u32_t width, u32_t height, std::string_view title) noexcept;
 
-    window();
-    window(window&& oth) { *this = std::move(oth); }
+    window() noexcept;
+    window(window&& oth) noexcept { *this = std::move(oth); }
     ~window();
 
     bool should_close() const;
@@ -26,7 +26,7 @@ public:
 
     GLFWwindow* handle() const { return _window; }
 
-    window& operator=(window&&);
+    window& operator=(window&&) noexcept;
 
 private:
     GLFWwindow* _window = nullptr;

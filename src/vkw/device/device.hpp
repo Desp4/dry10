@@ -3,7 +3,9 @@
 #ifndef DRY_VK_DEVICE_H
 #define DRY_VK_DEVICE_H
 
-#include "vkw/vkw.hpp"
+#include "instance.hpp"
+
+#include <vk_mem_alloc.h>
 
 namespace dry::vkw {
 
@@ -15,13 +17,12 @@ struct queue_info {
 
 class vk_device {
 public:
-    vk_device(
-        VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
+    vk_device(const vk_instance& instance, VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
         std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features
-    );
+    ) noexcept;
 
-    vk_device() = default;
-    vk_device(vk_device&& oth) { *this = std::move(oth); }
+    vk_device() noexcept = default;
+    vk_device(vk_device&& oth) noexcept { *this = std::move(oth); }
     ~vk_device();
 
     VkSurfaceCapabilitiesKHR surface_capabilities(VkSurfaceKHR surface) const;
@@ -31,13 +32,15 @@ public:
     u32_t find_memory_type_index(u32_t type_filter, VkMemoryPropertyFlags properties) const;
     void wait_on_device() const;
 
-    VkDevice handle()  const { return _device; }
+    VkDevice handle() const { return _device; }
+    VmaAllocator allocator() const { return _allocator; }
 
-    vk_device& operator=(vk_device&&);
+    vk_device& operator=(vk_device&&) noexcept;
 
 private:
     VkDevice _device = VK_NULL_HANDLE;
     VkPhysicalDevice _phys_device = VK_NULL_HANDLE;
+    VmaAllocator _allocator = VK_NULL_HANDLE;
 
     VkPhysicalDeviceMemoryProperties _mem_properties;
     VkPhysicalDeviceProperties _device_properties;

@@ -2,7 +2,7 @@
 
 namespace dry::vkw {
 
-vk_queue::vk_queue(const vk_device& device, u32_t queue_family_index, u32_t queue_index) :
+vk_queue::vk_queue(const vk_device& device, u32_t queue_family_index, u32_t queue_index) noexcept :
     _device{ &device },
     _pool{ device, queue_family_index }
 {
@@ -23,7 +23,7 @@ void vk_queue::submit_cmd(VkCommandBuffer cmd_buf, bool wait) const {
     }
 }
 
-vk_queue& vk_queue::operator=(vk_queue&& oth) {
+vk_queue& vk_queue::operator=(vk_queue&& oth) noexcept {
     // delete
     // don't need to
     // move

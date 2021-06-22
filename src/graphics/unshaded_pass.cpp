@@ -21,7 +21,7 @@ unshaded_pass create_unshaded_pass(const vkw::vk_device& device, const vkw::vk_q
     pass.dummy_image = vkw::vk_image_view_pair{
         device, { 512, 512 }, unshaded_pass::mip_levels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY,
         VK_IMAGE_ASPECT_COLOR_BIT
     };
     graphics_queue.transition_image_layout(pass.dummy_image.image(),
@@ -42,12 +42,12 @@ unshaded_pass create_unshaded_pass(const vkw::vk_device& device, const vkw::vk_q
     for (auto i = 0u; i < frame_count; ++i) {
         pass.instance_buffers.emplace_back(
             device, sizeof(unshaded_pass::instance_input) * unshaded_pass::combined_instance_buffer_count,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY
         );
     }
     pass.instance_staging_buffer = vkw::vk_buffer{
         device, sizeof(unshaded_pass::instance_input) * unshaded_pass::combined_instance_buffer_count,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY
     };
 
     const std::array desc_pool_sizes = generate_array(layout_bindings, desc_pool_lambda);
@@ -78,7 +78,7 @@ unshaded_pass create_unshaded_pass(const vkw::vk_device& device, const vkw::vk_q
     for (auto i = 0u; i < frame_count; ++i) {
         const auto& frame_ubo = pass.camera_transforms.emplace_back(
             device, sizeof(camera_transform),
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU
         );
 
         VkDescriptorBufferInfo camera_buffer_info{};

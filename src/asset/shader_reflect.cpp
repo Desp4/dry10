@@ -60,7 +60,7 @@ static void write_layout_bindings(
         binding.type = Desc_Type;
         binding.count = type.array.size() != 0 ? type.array[0] : 1;
         binding.stage = stage;
-        binding.stride = type.member_types.empty() ? 0 : compiler.get_declared_struct_size(type);
+        binding.stride = type.member_types.empty() ? 0 : static_cast<u32_t>(compiler.get_declared_struct_size(type));
 
         out_bindings.push_back(binding);
     }

@@ -193,6 +193,7 @@ function(fetch_spirv_cross)
     set(SPIRV_CROSS_VER 2021-01-15)
 
     # settings
+    message("-- downloading spirv-cross ${SPIRV_CROSS_VER}")
     set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE INTERNAL "Internal dependency option" FORCE)
     set(SPIRV_CROSS_SKIP_INSTALL ON CACHE INTERNAL "Internal dependency option" FORCE)
 
@@ -217,6 +218,32 @@ function(fetch_vulkan)
     endif()
 endfunction()
 
+function(fetch_vma)
+    if (TARGET vma)
+        return()
+    endif()
+
+    # NOTE : for static linking need alias, so need vulkan as a target first
+    fetch_vulkan()
+
+    set(VMA_REPO https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git)
+    set(VMA_HASH 0790b5f0a9b96cd79fe75e4f458fc6b468dd9ec3)
+
+    # NOTE : force static
+    message("-- downloading VulkanMemoryAllocator")
+    set(VMA_STATIC_VULKAN_FUNCTIONS ON CACHE INTERNAL "Internal dependency option" FORCE)
+    set(VMA_DYNAMIC_VULKAN_FUNCTIONS OFF CACHE INTERNAL "Internal dependency option" FORCE)
+
+    add_library(Vulkan::Vulkan ALIAS vulkan)
+
+    FetchContent_Declare(DEP_VMA
+        GIT_REPOSITORY ${VMA_REPO}
+        URL_HASH ${VMA_HASH})
+    FetchContent_MakeAvailable(DEP_VMA)
+
+    add_library(vma ALIAS VulkanMemoryAllocator)
+endfunction()
+
 function(fetch_all_deps)
     set(SKIP_INSTALL_ALL OFF CACHE INTERNAL "Internal dependency option" FORCE)
     set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "Internal dependency option" FORCE)
@@ -235,5 +262,6 @@ function(fetch_all_deps)
         fetch_libzip()
         fetch_stbi()
         fetch_spirv_cross()
+        fetch_vma()
     endif()
 endfunction()

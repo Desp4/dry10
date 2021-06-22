@@ -3,10 +3,11 @@ cmake_minimum_required(VERSION 3.12)
 project(dry1)
 set(CMAKE_CXX_STANDARD 20)
 
+set(DEP_SRC dep_tus/vma_impl.cpp)
+
 set(VKW_SOURCES
     vkw/buffer.cpp
     vkw/framebuffer.cpp
-    vkw/memory.cpp
     vkw/pipeline_g.cpp
     vkw/renderpass.cpp
     vkw/swapchain_p.cpp
@@ -45,6 +46,7 @@ set(UTIL_SOURCES
     util/fs.cpp)
 
 add_library(dry1 STATIC
+    ${DEP_SRC}
     ${VKW_SOURCES} 
     ${WINDOW_SOURCES}
     ${GRAPHICS_SOURCES}
@@ -58,4 +60,5 @@ target_link_libraries(dry1 PUBLIC
     glm
     zip
     stbi
-    spirv-cross-core)
+    spirv-cross-core
+    vma)

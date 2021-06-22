@@ -4,8 +4,8 @@
 
 namespace dry::vkw {
 
-vk_device::vk_device(VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
-    std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features)
+vk_device::vk_device(const vk_instance& instance, VkPhysicalDevice phys_device, std::span<const queue_info> queue_infos,
+    std::span<const char* const> extensions, const VkPhysicalDeviceFeatures& features) noexcept
 {
     _phys_device = phys_device;
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos(queue_infos.size());
@@ -31,9 +31,19 @@ vk_device::vk_device(VkPhysicalDevice phys_device, std::span<const queue_info> q
 
     vkGetPhysicalDeviceMemoryProperties(_phys_device, &_mem_properties);
     vkGetPhysicalDeviceProperties(_phys_device, &_device_properties);
+
+    // create vma allocator
+    VmaAllocatorCreateInfo alloc_info{};
+    alloc_info.vulkanApiVersion = vk_instance::api_version;
+    alloc_info.physicalDevice = _phys_device;
+    alloc_info.device = _device;
+    alloc_info.instance = instance.handle();
+    
+    vmaCreateAllocator(&alloc_info, &_allocator);
 }
 
 vk_device::~vk_device() {
+    vmaDestroyAllocator(_allocator);
     vkDestroyDevice(_device, null_alloc);
 }
 
@@ -44,6 +54,7 @@ VkSurfaceCapabilitiesKHR vk_device::surface_capabilities(VkSurfaceKHR surface) c
 }
 
 VkDeviceSize vk_device::pad_uniform_size(VkDeviceSize size) const {
+    // TODO : std::align yea or nah?
     const auto min_align = _device_properties.limits.minUniformBufferOffsetAlignment;
     VkDeviceSize aligned = size;
     if (min_align != 0) {
@@ -67,16 +78,18 @@ void vk_device::wait_on_device() const {
     vkDeviceWaitIdle(_device);
 }
 
-vk_device& vk_device::operator=(vk_device&& oth) {
+vk_device& vk_device::operator=(vk_device&& oth) noexcept {
     // destroy
     vkDestroyDevice(_device, null_alloc);
     // move
     _device = oth._device;
     _phys_device = oth._phys_device;
+    _allocator = oth._allocator;
     _mem_properties = std::move(oth._mem_properties);
     _device_properties = std::move(oth._device_properties);
     // null
     oth._device = VK_NULL_HANDLE;
+    oth._allocator = VK_NULL_HANDLE;
     return *this;
 }
 

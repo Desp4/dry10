@@ -4,11 +4,11 @@
 namespace dry::vkw {
 
 vk_instance::vk_instance(std::span<const char* const> extensions, const char* name,
-    std::span<const char* const> layers, debug_callback callback)
+    std::span<const char* const> layers, debug_callback callback) noexcept
 {
     VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    app_info.apiVersion = VK_API_VERSION_1_2;
+    app_info.apiVersion = api_version;
     app_info.pApplicationName = name;
     app_info.pEngineName = "dry1";
 
@@ -72,7 +72,7 @@ std::vector<VkPhysicalDevice> vk_instance::enumerate_physical_devices() const {
     return devices;
 }
 
-vk_instance& vk_instance::operator=(vk_instance&& oth) {
+vk_instance& vk_instance::operator=(vk_instance&& oth) noexcept {
     // destroy
     const auto destroy_debugger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
         vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT")

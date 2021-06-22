@@ -20,7 +20,7 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
     
     const auto phys_device = find_physical_device();
     const auto queue_infos = populate_queue_infos(phys_device);
-    _device = vkw::vk_device{ phys_device, queue_infos.device_queue_infos, _device_extensions, _device_features };
+    _device = vkw::vk_device{ instance, phys_device, queue_infos.device_queue_infos, _device_extensions, _device_features };
 
     _present_queue = vkw::vk_queue{ _device, queue_infos.queue_init_infos[0].family_ind, queue_infos.queue_init_infos[0].queue_ind };
     _graphics_queue = vkw::vk_queue_graphics{ _device, queue_infos.queue_init_infos[1].family_ind, queue_infos.queue_init_infos[1].queue_ind };
@@ -55,10 +55,7 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
 void vulkan_renderer::submit_frame() {
     // pre-sync operations, unshaded instance buffer
     {
-        unshaded_pass::instance_input* mapped_instances{};
-        vkMapMemory(_device.handle(), _unshaded_pass.instance_staging_buffer.memory_handle(),
-            0, _unshaded_pass.instance_staging_buffer.size(), 0, reinterpret_cast<void**>(&mapped_instances)
-        );
+        auto mapped_instances = _unshaded_pass.instance_staging_buffer.map<unshaded_pass::instance_input>();
 
         u32_t object_count = 0;
         for (const auto& pipeline : _resources.pipelines) {
@@ -72,7 +69,7 @@ void vulkan_renderer::submit_frame() {
             }
         }
 
-        vkUnmapMemory(_device.handle(), _unshaded_pass.instance_staging_buffer.memory_handle());
+        _unshaded_pass.instance_staging_buffer.unmap();
     }
 
     // acquire frame
@@ -85,10 +82,10 @@ void vulkan_renderer::submit_frame() {
 
     // === unshaded pass ===
 
-    // async
+    // TODO : can be async, need interface
     _transfer_queue.copy_buffer(
         _unshaded_pass.instance_staging_buffer.handle(), _unshaded_pass.instance_buffers[frame_index].handle(),
-        _unshaded_pass.instance_staging_buffer.size(), false
+        _unshaded_pass.instance_staging_buffer.size()
     );
 
     if (_unshaded_pass.texture_update_status[frame_index] == false) {
@@ -106,7 +103,7 @@ void vulkan_renderer::submit_frame() {
         cam_trans.proj = proj;
         cam_trans.view = view;
         cam_trans.viewproj = proj * view;
-        _unshaded_pass.camera_transforms[frame_index].write(cam_trans);
+        _unshaded_pass.camera_transforms[frame_index].write(std::span<const camera_transform>{ &cam_trans, 1 });
     }
 
     u32_t object_count = 0;
@@ -143,8 +140,8 @@ void vulkan_renderer::submit_frame() {
     vkCmdEndRenderPass(cmd_buffer_h);
     vkEndCommandBuffer(cmd_buffer_h);
 
-    // sync to async commands
-    _transfer_queue.wait_on_queue();
+    // sync to async commands TODO : can't, need cmd buffer to live up until this point
+    // _transfer_queue.wait_on_queue();
 
     _swapchain.submit_frame(_present_queue.handle(), frame_index, cmd_buffer_h);
 }

@@ -9,9 +9,9 @@ vulkan_renderer::resource_id vulkan_renderer::create_texture(const asset::textur
     vkw::vk_buffer staging_buffer{ _device,
         tex.pixel_data.size(),
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        VMA_MEMORY_USAGE_CPU_ONLY
     };
-    staging_buffer.write(tex.pixel_data);
+    staging_buffer.write(std::span{ tex.pixel_data });
 
     vkw::vk_image_view_pair texture{ _device,
         VkExtent2D{ tex.width, tex.height },
@@ -20,7 +20,7 @@ vulkan_renderer::resource_id vulkan_renderer::create_texture(const asset::textur
         asset::texture_vk_format(tex),
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY,
         VK_IMAGE_ASPECT_COLOR_BIT
     };
 
@@ -41,8 +41,8 @@ vulkan_renderer::resource_id vulkan_renderer::create_texture(const asset::textur
 vulkan_renderer::resource_id vulkan_renderer::create_mesh(const asset::mesh_asset& mesh) {
     renderer_resources::vertex_buffer mesh_buffer;
     // TODO : buffer for each mesh currently, do: allocate into one and offset into it
-    mesh_buffer.indices = _transfer_queue.create_local_buffer(mesh.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    mesh_buffer.vertices = _transfer_queue.create_local_buffer(mesh.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    mesh_buffer.indices = _transfer_queue.create_local_buffer(std::span{ mesh.indices }, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    mesh_buffer.vertices = _transfer_queue.create_local_buffer(std::span{ mesh.vertices }, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
     _resources.vertex_refcount.emplace(0);
     return static_cast<resource_id>(_resources.vertex_buffers.emplace(std::move(mesh_buffer)));

@@ -74,7 +74,7 @@ glm::mat4 scale_matrix(float val) {
 
 int main() {
     // init
-    wsi::window window{ 1400, 1000 };
+    wsi::window window{ 800, 800 };
     vulkan_renderer vk_rend{ window };
     asset::asset_registry asset_reg;
     asset::asset_resource_adapter res_adapter{ asset_reg };

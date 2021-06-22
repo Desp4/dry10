@@ -13,18 +13,18 @@ public:
     vk_image_view_pair(const vk_device& device,
         VkExtent2D dimensions, u32_t mip_lvls, VkSampleCountFlagBits samples,
         VkFormat img_format, VkImageTiling tiling, VkImageUsageFlags usage,
-        VkMemoryPropertyFlags properties, VkImageAspectFlags aspect_flags) :
-        _image{ device, dimensions, mip_lvls, samples, img_format, tiling, usage, properties },
+        VmaMemoryUsage memory_usage, VkImageAspectFlags aspect_flags) noexcept :
+        _image{ device, dimensions, mip_lvls, samples, img_format, tiling, usage, memory_usage },
         _view{ device, _image.handle(), img_format, mip_lvls, aspect_flags }
     {}
 
-    vk_image_view_pair() = default;
-    vk_image_view_pair(vk_image_view_pair&&) = default;
+    vk_image_view_pair() noexcept = default;
+    vk_image_view_pair(vk_image_view_pair&&) noexcept = default;
 
     const vk_image& image() const { return _image; }
     const vk_image_view& view() const { return _view; }
 
-    vk_image_view_pair& operator=(vk_image_view_pair&&) = default;
+    vk_image_view_pair& operator=(vk_image_view_pair&&) noexcept = default;
 
 private:
     vk_image _image;

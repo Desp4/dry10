@@ -2,7 +2,7 @@
 
 namespace dry::vkw {
 
-vk_image_view::vk_image_view(const vk_device& device, VkImage image, VkFormat format, u32_t mip_lvls, VkImageAspectFlags aspect_flags) :
+vk_image_view::vk_image_view(const vk_device& device, VkImage image, VkFormat format, u32_t mip_lvls, VkImageAspectFlags aspect_flags) noexcept :
     _device{ &device }
 {
     VkImageViewCreateInfo view_info{};
@@ -25,7 +25,7 @@ vk_image_view::~vk_image_view() {
     }    
 }
 
-vk_image_view& vk_image_view::operator=(vk_image_view&& oth) {
+vk_image_view& vk_image_view::operator=(vk_image_view&& oth) noexcept {
     // destroy
     if (_device != nullptr) {
         vkDestroyImageView(_device->handle(), _view, null_alloc);

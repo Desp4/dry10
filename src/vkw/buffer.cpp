@@ -2,7 +2,7 @@
 
 namespace dry::vkw {
 
-vk_buffer::vk_buffer(const vk_device& device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) :
+vk_buffer::vk_buffer(const vk_device& device, VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage) noexcept :
     _device{ &device },
     _true_size{ size }
 {
@@ -12,31 +12,31 @@ vk_buffer::vk_buffer(const vk_device& device, VkDeviceSize size, VkBufferUsageFl
     buffer_info.usage = usage;
     buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    vkCreateBuffer(_device->handle(), &buffer_info, null_alloc, &_buffer);
+    VmaAllocationCreateInfo alloc_info{};
+    alloc_info.usage = memory_usage;
 
-    // Get memory requirements
-    VkMemoryRequirements mem_requirements;
-    vkGetBufferMemoryRequirements(_device->handle(), _buffer, &mem_requirements);
+    vmaCreateBuffer(device.allocator(), &buffer_info, &alloc_info, &_buffer, &_alloc, nullptr);
+}
 
-    _memory = vk_device_memory{ *_device,mem_requirements.size, _device->find_memory_type_index(mem_requirements.memoryTypeBits, properties) };
-    vkBindBufferMemory(_device->handle(), _buffer, _memory.handle(), 0);
+void vk_buffer::unmap() const {
+    vmaUnmapMemory(_device->allocator(), _alloc);
 }
 
 vk_buffer::~vk_buffer() {
     if (_device != nullptr) {
-        vkDestroyBuffer(_device->handle(), _buffer, null_alloc);
+        vmaDestroyBuffer(_device->allocator(), _buffer, _alloc);
     }
 }
 
-vk_buffer& vk_buffer::operator=(vk_buffer&& oth) {
+vk_buffer& vk_buffer::operator=(vk_buffer&& oth) noexcept {
     // destroy
     if (_device != nullptr) {
-        vkDestroyBuffer(_device->handle(), _buffer, null_alloc);
+        vmaDestroyBuffer(_device->allocator(), _buffer, _alloc);
     }
     // move
     _device = oth._device;
     _buffer = oth._buffer;
-    _memory = std::move(oth._memory);
+    _alloc = oth._alloc;
     _true_size = oth._true_size;
     // null
     oth._device = nullptr;

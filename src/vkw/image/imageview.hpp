@@ -9,15 +9,15 @@ namespace dry::vkw {
 
 class vk_image_view {
 public:
-    vk_image_view(const vk_device& device, VkImage image, VkFormat format, u32_t mip_lvls, VkImageAspectFlags aspect_flags);
+    vk_image_view(const vk_device& device, VkImage image, VkFormat format, u32_t mip_lvls, VkImageAspectFlags aspect_flags) noexcept;
 
-    vk_image_view() = default;
-    vk_image_view(vk_image_view&& oth) { *this = std::move(oth); }
+    vk_image_view() noexcept = default;
+    vk_image_view(vk_image_view&& oth) noexcept { *this = std::move(oth); }
     ~vk_image_view();
 
     VkImageView handle() const { return _view; }
 
-    vk_image_view& operator=(vk_image_view&&);
+    vk_image_view& operator=(vk_image_view&&) noexcept;
 
 private:
     const vk_device* _device = nullptr;

@@ -55,9 +55,9 @@ struct unshaded_pass {
     vkw::vk_image_view_pair dummy_image;
 
     static constexpr u32_t mip_levels = 8;
-    static constexpr u32_t texture_array_size = 32;
+    static constexpr u32_t texture_array_size = 4096;
     static constexpr u32_t combined_instance_buffer_count = 4096 * 8; // TODO : hardcoded, shouldn't be
-    // not counting sampler in fragment, set by each pipeline
+
     static constexpr asset::vk_shader_data::layout_binding_info camera_layout_binding{
         .binding = 0,
         .set = 0,

@@ -2,9 +2,8 @@
 
 namespace dry::vkw {
 
-vk_image::vk_image(const vk_device& device,
-    VkExtent2D dimensions, u32_t mip_lvls, VkSampleCountFlagBits samples, VkFormat img_format,
-    VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties) :
+vk_image::vk_image(const vk_device& device, VkExtent2D dimensions, u32_t mip_lvls, VkSampleCountFlagBits samples,
+    VkFormat img_format, VkImageTiling tiling, VkImageUsageFlags usage, VmaMemoryUsage memory_usage) noexcept :
     _device{ &device },
     _extent{ dimensions },
     _mip_levels{ mip_lvls },
@@ -25,32 +24,27 @@ vk_image::vk_image(const vk_device& device,
     image_info.samples = samples;
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    vkCreateImage(_device->handle(), &image_info, null_alloc, &_image);
-    VkMemoryRequirements mem_requirements{};
-    vkGetImageMemoryRequirements(_device->handle(), _image, &mem_requirements);
+    VmaAllocationCreateInfo alloc_info{};
+    alloc_info.usage = memory_usage;
 
-    _memory = vk_device_memory{
-        *_device, mem_requirements.size,
-        _device->find_memory_type_index(mem_requirements.memoryTypeBits, properties)
-    };
-    vkBindImageMemory(_device->handle(), _image, _memory.handle(), 0); // NOTE : no offset
+    vmaCreateImage(device.allocator(), &image_info, &alloc_info, &_image, &_alloc, nullptr);
 }
 
 vk_image::~vk_image() {
     if (_device != nullptr) {
-        vkDestroyImage(_device->handle(), _image, null_alloc);
+        vmaDestroyImage(_device->allocator(), _image, _alloc);
     }
 }
 
-vk_image& vk_image::operator=(vk_image&& oth) {
+vk_image& vk_image::operator=(vk_image&& oth) noexcept {
     // destroy
     if (_device != nullptr) {
-        vkDestroyImage(_device->handle(), _image, null_alloc);
+        vmaDestroyImage(_device->allocator(), _image, _alloc);
     }
     // move
     _device = oth._device;
     _image = oth._image;
-    _memory = std::move(oth._memory);
+    _alloc = oth._alloc;
     _extent = oth._extent;
     _mip_levels = oth._mip_levels;
     _format = oth._format;
