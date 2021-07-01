@@ -24,6 +24,10 @@ struct is_hashed_asset<hashed_asset<T>> : std::true_type {
 // NOTE : hash map references have to be persistent
 class asset_registry final {
 public:
+    asset_registry() = default;
+    asset_registry(const asset_registry&) = delete;
+    asset_registry& operator=(const asset_registry&) = delete;
+
     template<class T>
     using hashmap_pool = std::unordered_map<hash_t, T>;
     template<class T>
@@ -44,8 +48,8 @@ public:
     template<typename Asset> requires is_hashed_asset<Asset>::value
     void unload(const std::string& name);
 
-    template<typename Asset> requires is_hashed_asset<Asset>::value
-    const Asset& create(const typename is_hashed_asset<Asset>::type& init_value);
+    template<typename Asset, typename... Ts> requires is_hashed_asset<Asset>::value
+    const Asset& create(Ts&&... args);
 
     void unload_all() { _asset_pools.clear(); }
 
@@ -54,7 +58,7 @@ private:
     void assure_pool_size();
 
     filesystem _filesys;
-    // NOTE : not expected to loop through it so just store the base ptr
+
     std::vector<std::any> _asset_pools;
     persistent_array<persistent_index_type> _runtime_asset_indices;
 
@@ -81,7 +85,7 @@ const Asset& asset_registry::get(hash_t hash) {
         }
     }
 
-    return std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id])[hash];
+    return hashmap[hash];
 }
 
 template<typename Asset> requires is_hashed_asset<Asset>::value
@@ -148,8 +152,9 @@ void asset_registry::unload(const std::string& name) {
     return unload<Asset>(_filesys.compute_hash<underlying>(name));
 }
 
-template<typename Asset> requires is_hashed_asset<Asset>::value
-const Asset& asset_registry::create(const typename is_hashed_asset<Asset>::type& init_value) {
+template<typename Asset, typename... Ts> requires is_hashed_asset<Asset>::value
+const Asset& asset_registry::create(Ts&&... args) {
+    using underlying_t = is_hashed_asset<Asset>::type;
     static const auto t_id = asset_type_id<Asset>::value();
 
     const hash_t runtime_hash = _runtime_hash_flag | static_cast<hash_t>(_runtime_asset_indices.emplace(0));
@@ -157,7 +162,7 @@ const Asset& asset_registry::create(const typename is_hashed_asset<Asset>::type&
     assure_pool_size<Asset>();
 
     auto& hashmap = std::any_cast<hashmap_pool<Asset>&>(_asset_pools[t_id]);
-    return hashmap.insert(std::make_pair(runtime_hash, Asset{ init_value, runtime_hash })).first->second;
+    return hashmap.insert(std::make_pair(runtime_hash, Asset{ underlying_t{ std::forward<Ts>(args)... }, runtime_hash })).first->second;
 }
 
 template<typename Asset>

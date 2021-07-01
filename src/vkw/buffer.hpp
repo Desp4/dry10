@@ -16,7 +16,7 @@ public:
     ~vk_buffer();
 
     template<typename T>
-    void write(std::span<const T> src);
+    void write(std::span<const T> src, u64_t offset = 0) const;
 
     template<typename T = void>
     T* map() const;
@@ -37,8 +37,8 @@ private:
 
 
 template<typename T>
-void vk_buffer::write(std::span<const T> src) {
-    auto dst = map<T>();
+void vk_buffer::write(std::span<const T> src, u64_t offset) const {
+    auto dst = reinterpret_cast<T*>(reinterpret_cast<std::byte*>(map<T>()) + offset);
     std::copy(src.begin(), src.end(), dst);
     vmaUnmapMemory(_device->allocator(), _alloc);
 }

@@ -5,21 +5,24 @@
 
 #include "asset/vk_reflect.hpp"
 
-#include "vkw/vkw.hpp"
+#include "vkw/queue/queue_graphics.hpp"
+#include "vkw/queue/queue_transfer.hpp"
+#include "vkw/image/imageviewpair.hpp"
 
 namespace dry {
 
-struct vertex_input_setting {
-    VkVertexInputBindingDescription binding_description;
-    u32_t first_location;
-};
-
 struct vk_vertex_input {
-    std::vector<VkVertexInputBindingDescription> binding_desc;
+    // only 1
+    VkVertexInputBindingDescription binding_desc;
     std::vector<VkVertexInputAttributeDescription> attribute_desc;
 };
 
-vk_vertex_input select_vertex_input(std::vector<asset::vk_shader_data::vertex_binding_info> binding_infos, std::span<const vertex_input_setting> filter);
+vk_vertex_input vertex_bindings_to_input(std::vector<asset::vk_shader_data::vertex_binding_info> bindings);
+
+vkw::vk_image_view_pair create_sampled_texture(const vkw::vk_device& device,
+    const vkw::vk_queue_graphics& g_queue, const vkw::vk_queue_transfer& t_queue, const_byte_span data,
+    VkExtent2D dimensions, u32_t mip_lvls, VkFormat img_format
+);
 
 constexpr VkWriteDescriptorSet desc_write_from_binding(VkDescriptorSetLayoutBinding binding) {
     VkWriteDescriptorSet desc_write{};
@@ -46,6 +49,25 @@ constexpr VkDescriptorSetLayoutBinding layout_binding_from_reflect_info(const as
     ret_layout_binding.descriptorType = binding_info.type;
     ret_layout_binding.stageFlags = binding_info.stage;
     return ret_layout_binding;
+}
+
+template<auto Func>
+auto extract_shader_layouts(std::vector<asset::vk_shader_data::layout_binding_info>& in) -> std::remove_reference_t<decltype(in)> {
+    using desc_vec_t = std::remove_reference_t<decltype(in)>;
+
+    desc_vec_t ret_arr;
+    desc_vec_t::iterator it = in.begin();
+    while (it != in.end()) {
+        it = std::find_if(it, in.end(), Func);
+        if (it == in.end()) {
+            break;
+        }
+
+        ret_arr.push_back(std::move(*it));
+        it = in.erase(it);
+    }
+
+    return ret_arr;
 }
 
 }

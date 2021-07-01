@@ -4,6 +4,7 @@
 #define DRY_UTIL_UTIL_H
 
 #include <utility>
+#include <array>
 #include "util/num.hpp"
 
 namespace dry {
@@ -16,56 +17,15 @@ constexpr u32_t popcount(u32_t i) noexcept {
     return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
 }
 
-// taking T by value everywhere
-template<typename T, T Null_Value>
-struct nullable_primitive {
-    T val;
-
-    nullable_primitive() : val{ Null_Value } {}
-    nullable_primitive(const nullable_primitive&) = default;
-    nullable_primitive(nullable_primitive&& oth) { *this = std::move(oth); }
-    nullable_primitive(T oth) : val{ oth } {}
-
-    nullable_primitive& operator=(nullable_primitive&& oth) {
-        if (this != &oth) {
-            val = oth.val;
-            oth.val = nullptr;
-        }
-        return *this;
+template<typename T, std::size_t N, typename Functor>
+constexpr auto generate_array(const std::array<T, N>& range, Functor fun) {
+    using U = decltype(fun(std::declval<T>()));
+    std::array<U, N> ret;
+    for (auto i = 0u; i < N; ++i) {
+        ret[i] = fun(range[i]);
     }
-    nullable_primitive& operator=(const nullable_primitive& oth) {
-        val = oth.val;
-        return *this;
-    }
-    nullable_primitive& operator=(T oth) {
-        val = oth;
-        return *this;
-    }
-
-    operator T () const {
-        return val;
-    }
-    T const* operator&() const {
-        return &val;
-    }
-    T* operator&() {
-        return &val;
-    }
-
-
-};
-
-template<typename T>
-struct nullable_ptr : nullable_primitive<T*, nullptr> {
-    using nullable_primitive<T*, nullptr>::nullable_primitive;
-
-    T& operator*() const {
-        return *(this->val);
-    }
-    T* operator->() const {
-        return this->val;
-    }
-};
+    return ret;
+}
 
 }
 

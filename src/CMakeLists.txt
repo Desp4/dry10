@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.12)
 project(dry1)
 set(CMAKE_CXX_STANDARD 20)
 
-set(DEP_SRC dep_tus/vma_impl.cpp)
+set(DEP_SOURCES dep_tus/vma_impl.cpp)
 
 set(VKW_SOURCES
     vkw/buffer.cpp
@@ -33,24 +33,28 @@ set(WINDOW_SOURCES
 
 set(GRAPHICS_SOURCES
     graphics/renderer.cpp
-    graphics/unshaded_pass.cpp
+    graphics/instanced_pass.cpp
     graphics/renderer_creates.cpp
-    graphics/vk_initers.cpp)
+    graphics/vk_initers.cpp
+    graphics/texarr.cpp
+    graphics/pipeline_resources.cpp)
 
 set(ASSET_SOURCES
     asset/filesys.cpp
-    asset/asset_resource_adapter.cpp
     asset/shader_reflect.cpp)
+
+set(ENGINE_SOURCES engine/dry_program.cpp)
 
 set(UTIL_SOURCES
     util/fs.cpp)
 
 add_library(dry1 STATIC
-    ${DEP_SRC}
+    ${DEP_SOURCES}
     ${VKW_SOURCES} 
     ${WINDOW_SOURCES}
     ${GRAPHICS_SOURCES}
     ${ASSET_SOURCES}
+    ${ENGINE_SOURCES}
     ${UTIL_SOURCES})
 
 target_include_directories(dry1 PUBLIC ${PROJECT_SOURCE_DIR})

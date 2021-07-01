@@ -4,11 +4,14 @@
 #define DRY_ASSET_SRC_H
 
 #include <string_view>
+#include <memory>
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
 #include "util/num.hpp"
+
+#include "graphics/material_base.hpp"
 
 namespace dry::asset {
 
@@ -53,7 +56,10 @@ struct shader_source {
 
 struct material_source {
     hash_t shader;
-    std::vector<hash_t> textures;
+    std::shared_ptr<material_base> material; // TODO : write a wrapper, std::any in assetreg needs copy
+
+    material_source() = default;
+    material_source(hash_t sh, material_base* mat) : shader{ sh }, material{ mat }{}
 };
 
 // extension lookup
@@ -75,7 +81,7 @@ struct asset_source_ext<shader_source> {
     static constexpr std::string_view vert_ext = ".vertex.shader";
     static constexpr std::string_view frag_ext = ".fragment.shader";
 
-    static constexpr std::string_view ext = ".shader"; // NOTE : default to vertex, 0 always present
+    static constexpr std::string_view ext = ".shader";
 };
 
 template<typename Asset>

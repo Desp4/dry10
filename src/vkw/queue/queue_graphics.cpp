@@ -1,5 +1,7 @@
 #include "queue_graphics.hpp"
 
+#include "dbg/log.hpp"
+
 namespace dry::vkw {
 
 void vk_queue_graphics::transition_image_layout(const vk_image& image, VkImageLayout layout_old, VkImageLayout layout_new) const {
@@ -28,24 +30,36 @@ void vk_queue_graphics::transition_image_layout(const vk_image& image, VkImageLa
     } else {
         image_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     }
-
+    // TODO : generalize and un-if it?
+    // 
+    // from undefined to writable, used when: just created a sampled texture
     if (layout_old == VK_IMAGE_LAYOUT_UNDEFINED && layout_new == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         image_barrier.srcAccessMask = 0;
         image_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         stage_src = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         stage_dst = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    // from dst to optimal, used when: written the texture data, make it usable in shader, text step in sampled image creation
     } else if (layout_old == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && layout_new == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         image_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         image_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         stage_src = VK_PIPELINE_STAGE_TRANSFER_BIT;
         stage_dst = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    // from undefined to stencil, used when: depth
     } else if (layout_old == VK_IMAGE_LAYOUT_UNDEFINED && layout_new == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
         image_barrier.srcAccessMask = 0;
         image_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         stage_src = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         stage_dst = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    // from undefined to optimal, used when: creating dummy images
+    } else if(layout_old == VK_IMAGE_LAYOUT_UNDEFINED && layout_new == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        image_barrier.srcAccessMask = 0;
+        image_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        stage_src = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        stage_dst = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else {
+        LOG_ERR("Desired image transfer not supported");
+        dbg::panic();
     }
-    // else bad, not supported
 
     vkCmdPipelineBarrier(cmd_buf.handle(), stage_src, stage_dst, 0, 0, nullptr, 0, nullptr, 1, &image_barrier);
     submit_cmd(cmd_buf.handle());

@@ -4,8 +4,6 @@
 #include "renderer.hpp"
 
 #include <algorithm>
-// tmp for tests
-#include <glm/gtc/matrix_transform.hpp>
 
 #include "dbg/log.hpp"
 
@@ -44,32 +42,36 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
     };
     _render_pass.create_framebuffers(_swapchain.swap_views());
 
-    _unshaded_pass = create_unshaded_pass(_device, _graphics_queue, _image_count);
+    _instanced_pass = create_instanced_pass(_device, _image_count);
+    
+    _texarr = create_texture_array(_device, _graphics_queue, _image_count);
 
     _cmd_buffers.resize(_image_count);
     for (auto& cmd_buffer : _cmd_buffers) {
         cmd_buffer = vkw::vk_cmd_buffer{ _device, _present_queue.cmd_pool() };
     }
+
+    _resources.cam_transform = &_default_cam_transform;
 }
 
 void vulkan_renderer::submit_frame() {
-    // pre-sync operations, unshaded instance buffer
+    // pre-sync operations, instance transform buffer
     {
-        auto mapped_instances = _unshaded_pass.instance_staging_buffer.map<unshaded_pass::instance_input>();
+        auto mapped_instances = _instanced_pass.instance_staging_buffer.map<instanced_pass::instance_input>();
 
         u32_t object_count = 0;
         for (const auto& pipeline : _resources.pipelines) {
             for (const auto& [mesh, renderables] : pipeline.renderables) {
                 for (const auto& renderable : renderables) {
                     mapped_instances[object_count].transform = *renderable.transform_ptr;
-                    // NOTE : hardcoded pick 1 first as tex
-                    mapped_instances[object_count].tex_index = static_cast<u32_t>(_resources.materials[renderable.material].textures[0]);
+                    mapped_instances[object_count].material = renderable.material;
+
                     object_count += 1;
                 }
             }
         }
 
-        _unshaded_pass.instance_staging_buffer.unmap();
+        _instanced_pass.instance_staging_buffer.unmap();
     }
 
     // acquire frame
@@ -80,54 +82,58 @@ void vulkan_renderer::submit_frame() {
     vkResetCommandBuffer(cmd_buffer_h, 0);
     _render_pass.start_cmd_pass(cmd_buffer, frame_index);
 
-    // === unshaded pass ===
+    // === instanced pass ===
 
     // TODO : can be async, need interface
     _transfer_queue.copy_buffer(
-        _unshaded_pass.instance_staging_buffer.handle(), _unshaded_pass.instance_buffers[frame_index].handle(),
-        _unshaded_pass.instance_staging_buffer.size()
+        _instanced_pass.instance_staging_buffer.handle(), _instanced_pass.instance_buffers[frame_index].handle(),
+        _instanced_pass.instance_staging_buffer.size()
     );
 
-    if (_unshaded_pass.texture_update_status[frame_index] == false) {
-        update_texture_descriptors(_device, _unshaded_pass, frame_index);
-    }
+    _instanced_pass.camera_transforms[frame_index].write(std::span<const camera_transform>{ _resources.cam_transform, 1 });
 
-    // write camera transform, hardcoded to fixed point
-    {
-        glm::vec3 cam_pos{ 0.0f, -5.0f, 0.0f };
-        glm::mat4 view = glm::translate(glm::mat4(1.0f), cam_pos);
-        glm::mat4 proj = glm::perspective(glm::radians(70.0f), 1.0f, 0.1f, 8000.0f);
-        proj[1][1] *= -1;
-
-        camera_transform cam_trans{};
-        cam_trans.proj = proj;
-        cam_trans.view = view;
-        cam_trans.viewproj = proj * view;
-        _unshaded_pass.camera_transforms[frame_index].write(std::span<const camera_transform>{ &cam_trans, 1 });
-    }
+    _texarr.update_descriptors(_device, frame_index);
 
     u32_t object_count = 0;
     constexpr std::array<VkDeviceSize, 1> offsets{ 0 };
-    std::array<VkBuffer, 2> vertex_buffers;
-    vertex_buffers[0] = _unshaded_pass.instance_buffers[frame_index].handle();
 
-    for (const auto& pipeline : _resources.pipelines) {
+    for (auto& pipeline : _resources.pipelines) {
+        // check if material buffers are up to date, don't like it TODO :
+        if (pipeline.pipeline_data.has_materials() && !pipeline.material_update_status[frame_index]) {
+            auto* material_buffer = pipeline.pipeline_data.buffer_data<std::byte>(frame_index, pipeline_resources::material_ssbo_location);
+            const auto material_stride = pipeline.pipeline_data.material_stride();
+
+            for (const auto material : pipeline.material_inds) {
+                _resources.materials[material]->write_material_info(material_buffer);
+                material_buffer += material_stride;
+            }
+
+            pipeline.material_update_status[frame_index] = true;
+        }
+        
         pipeline.pipeline.bind_pipeline(cmd_buffer_h);
 
         // bind unshaded pass descriptors, NOTE : iirc if changing pipelines they stay bound, so redundant possibly?
         vkCmdBindDescriptorSets(cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline.layout(),
-            0, 1, &_unshaded_pass.unshaded_descriptors[frame_index], 0, nullptr
+            0, 1, &_instanced_pass.instance_descriptors[frame_index], 0, nullptr
         );
+        // bind shared descriptors
+        {
+            auto& frame_shared_descs = pipeline.shared_descriptors[frame_index];
+            if (frame_shared_descs.size() != 0) {
+                vkCmdBindDescriptorSets(cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline.layout(),
+                    1, static_cast<u32_t>(frame_shared_descs.size()), frame_shared_descs.data(), 0, nullptr
+                );
+            }
+        }
 
-        // bind unshaded instance buffer, TODO : need to call for every pipeline?
-        vkCmdBindVertexBuffers(cmd_buffer_h, 1, 1, &vertex_buffers[0], offsets.data());
+        pipeline.pipeline_data.bind_resources(frame_index, cmd_buffer_h, pipeline.pipeline.layout());
 
-        // local pipeline bind goes here, nothing though currently
         for (const auto& [mesh, renderables] : pipeline.renderables) {
             const auto& vertex_buffer = _resources.vertex_buffers[mesh];
-            vertex_buffers[1] = vertex_buffer.vertices.handle();
+            const auto vertex_buffer_h = vertex_buffer.vertices.handle();
 
-            vkCmdBindVertexBuffers(cmd_buffer_h, 0, 1, &vertex_buffers[1], offsets.data());
+            vkCmdBindVertexBuffers(cmd_buffer_h, 0, 1, &vertex_buffer_h, offsets.data());
             vkCmdBindIndexBuffer(cmd_buffer_h, vertex_buffer.indices.handle(), 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdDrawIndexed(cmd_buffer_h, static_cast<u32_t>(vertex_buffer.indices.size() / sizeof(u32_t)),
@@ -140,8 +146,7 @@ void vulkan_renderer::submit_frame() {
     vkCmdEndRenderPass(cmd_buffer_h);
     vkEndCommandBuffer(cmd_buffer_h);
 
-    // sync to async commands TODO : can't, need cmd buffer to live up until this point
-    // _transfer_queue.wait_on_queue();
+    // TODO : wait for asyncs here
 
     _swapchain.submit_frame(_present_queue.handle(), frame_index, cmd_buffer_h);
 }

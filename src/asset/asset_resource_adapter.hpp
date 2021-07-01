@@ -13,12 +13,15 @@ public:
     using index_type = vulkan_renderer::resource_id;
 
     asset_resource_adapter() = default;
-    asset_resource_adapter(asset_registry& asset_reg);
-    void attach_renderer(vulkan_renderer& renderer);
+    asset_resource_adapter(asset_registry& asset_reg) : _asset_reg{ &asset_reg } {}
+    void attach_renderer(vulkan_renderer& renderer) { _renderer = &renderer; }
 
     // TODO : by name would be nice to have
-    template<typename Asset>
+    template<typename Asset> requires (!std::is_same_v<Asset, material_asset>)
     index_type get_resource_index(hash_t hash);
+    template<typename Asset, typename Material> requires std::is_same_v<Asset, material_asset>
+    index_type get_resource_index(hash_t hash);
+
 
 private:
     template<typename Asset>
@@ -55,7 +58,7 @@ struct asset_resource_adapter::resource_binding<shader_asset> {
     static constexpr auto backref = &asset_resource_adapter::_shader_backref;
 };
 
-template<typename Asset>
+template<typename Asset> requires (!std::is_same_v<Asset, material_asset>)
 asset_resource_adapter::index_type asset_resource_adapter::get_resource_index(hash_t hash) {
     if (_renderer_asset_map.contains(hash)) {
         return _renderer_asset_map[hash];
@@ -69,8 +72,21 @@ asset_resource_adapter::index_type asset_resource_adapter::get_resource_index(ha
     return ind;
 }
 
-template<>
-asset_resource_adapter::index_type asset_resource_adapter::get_resource_index<material_asset>(hash_t hash);
+template<typename Asset, typename Material> requires std::is_same_v<Asset, material_asset>
+asset_resource_adapter::index_type asset_resource_adapter::get_resource_index(hash_t hash) {
+    if (_renderer_asset_map.contains(hash)) {
+        return _renderer_asset_map[hash];
+    }
+
+    const auto& res = _asset_reg->get<material_asset>(hash);
+
+    const index_type pipeline_ind = get_resource_index<shader_asset>(res.shader);
+
+    const auto ind = _renderer->create_material<Material>(pipeline_ind, *reinterpret_cast<Material*>(res.material.get()));
+    _material_backref[ind] = hash;
+
+    return ind;
+}
 
 }
 
