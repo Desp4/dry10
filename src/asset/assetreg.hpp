@@ -34,9 +34,9 @@ public:
     using asset_type_id = util::type_id<T, asset_registry>;
     // TODO : string_view overload please
     template<typename Asset> requires is_hashed_asset<Asset>::value
-    const Asset& get(hash_t hash);
+    Asset& get(hash_t hash);
     template<typename Asset> requires is_hashed_asset<Asset>::value
-    const Asset& get(const std::string& name);
+    Asset& get(const std::string& name);
 
     template<typename Asset> requires is_hashed_asset<Asset>::value
     void load(hash_t hash);
@@ -68,7 +68,7 @@ private:
 
 
 template<typename Asset> requires is_hashed_asset<Asset>::value
-const Asset& asset_registry::get(hash_t hash) {
+Asset& asset_registry::get(hash_t hash) {
     static const auto t_id = asset_type_id<Asset>::value();
 
     assure_pool_size<Asset>();
@@ -89,7 +89,7 @@ const Asset& asset_registry::get(hash_t hash) {
 }
 
 template<typename Asset> requires is_hashed_asset<Asset>::value
-const Asset& asset_registry::get(const std::string& name) {
+Asset& asset_registry::get(const std::string& name) {
     using underlying = typename is_hashed_asset<Asset>::type;
     return get<Asset>(_filesys.compute_hash<underlying>(name));
 }

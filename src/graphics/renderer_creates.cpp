@@ -123,7 +123,7 @@ vulkan_renderer::renderable_id vulkan_renderer::create_renderable(resource_id ma
     renderable_id rend;
     rend.mesh = static_cast<u16_t>(mesh);
     rend.pipeline = static_cast<u16_t>(material_data.pipeline_index);
-    rend.renderable = static_cast<u32_t>(_resources.pipelines[rend.pipeline].renderables[mesh].emplace(&_default_transform, static_cast<u32_t>(material_data.local_index)));
+    rend.renderable = static_cast<u32_t>(_resources.pipelines[rend.pipeline].renderables[mesh].emplace(_default_transform, static_cast<u32_t>(material_data.local_index)));
 
     return rend;
 }
@@ -134,8 +134,11 @@ void vulkan_renderer::destroy_renderable(renderable_id rend) {
     // TODO : cleanup and refcounting
 }
 
-void vulkan_renderer::bind_renderable_transform(renderable_id rend, const object_transform& transform) {
-    _resources.pipelines[rend.pipeline].renderables[rend.mesh][rend.renderable].transform_ptr = &transform;
+void vulkan_renderer::update_renderable_transform(renderable_id rend, const object_transform& trans) {
+    _resources.pipelines[rend.pipeline].renderables[rend.mesh][rend.renderable].transform = trans;
+}
+void vulkan_renderer::update_camera_transform(const camera_transform& trans) {
+    _resources.cam_transform = trans;
 }
 
 }

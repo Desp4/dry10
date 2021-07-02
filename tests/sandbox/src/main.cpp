@@ -1,7 +1,6 @@
-#include <glm/gtc/matrix_transform.hpp>
+#include <random>
 
-#include "graphics/renderer.hpp"
-#include "asset/asset_resource_adapter.hpp"
+#include "engine/dry_program.hpp"
 
 using namespace dry;
 
@@ -21,287 +20,182 @@ public:
     void write_material_info(std::byte* dst) const override {}
 };
 
-constexpr u32_t circle_count = 40;
-constexpr u32_t circle_obj_count = 200;
-constexpr f32_t angle_offset = 2 * glm::pi<f32_t>() / circle_obj_count;
+class orbitals : public dry_program {
+public:
+    orbitals();
 
-constexpr u32_t delete_rend_start_us = 100000;
-constexpr u32_t new_rend_start_us = 0;
-constexpr u32_t mutate_circle_us = 200000;
+    bool update() override;
 
-constexpr std::array<std::string_view, 3> shader_names{ "def_tex_inst", "def_inv_inst", "def_pos_inst" };
-constexpr std::array<std::string_view, 3> mesh_names{ "volga", "viking_room", "granite" };
-constexpr std::array mesh_scales{ 10.0f / 10.0f, 0.2f / 10.0f, 10.0f / 10.0f };
+private:
+    // assets
+    static constexpr std::array _shader_names{ "def_tex_inst", "def_inv_inst", "def_pos_inst" };
+    static constexpr std::array _mesh_names{ "volga", "viking_room", "granite" };
+    static constexpr std::array _texture_names = _mesh_names;
+    static constexpr std::array _mesh_scaling_factors{ 1.0f, 0.02f , 1.0f };
+    // orbit
+    static constexpr u32_t _orbit_count = 20;
+    static constexpr u32_t _orbit_object_count = 200;
+    static constexpr f32_t _orbit_object_angle_delta = 2 * glm::pi<f32_t>() / _orbit_object_count;
+    // spawn
+    static constexpr f64_t _spawn_period = 1;
+    static constexpr f64_t _spawn_delete_start = 0.5;
+    static constexpr f64_t _spawn_create_start = 0.0;
+    // speed
+    static constexpr f32_t _fov_speed = 0.05f;
+    static constexpr f32_t _camera_speed = 75.0f;
+    static constexpr f32_t _camera_sensetivity = 0.01f;
 
-constexpr u32_t win_width = 800;
-constexpr u32_t win_height = 800;
+    struct object_orbit {
+        std::vector<renderable> objects;
+        f32_t distance;
+        f32_t anglular_offset;
+        f32_t angular_speed;
+        f32_t direction;
+        f32_t radius;
+    };
 
-constexpr f32_t camera_speed = 75.0f;
-constexpr f32_t camera_sensetivity = 0.01f;
-constexpr f32_t scroll_speed = 0.05f;
+    struct {
+        std::random_device device;
+        std::mt19937 rng{ device() };
+        std::uniform_int_distribution<u32_t> mesh_distr{ 0, static_cast<u32_t>(_mesh_names.size() - 1) };
+        std::uniform_int_distribution<u32_t> shader_distr{ 0, static_cast<u32_t>(_shader_names.size() - 1) };
+    } _rng;
 
-struct rend_pair {
-    vulkan_renderer::renderable_id handle;
-    object_transform transform;
-    glm::mat4 pos;
-    glm::mat4 scale;
+    std::array<std::array<res_index, _shader_names.size()>, _texture_names.size()> _materials;
+    std::array<res_index, _mesh_names.size()> _meshes;
+
+    std::vector<object_orbit> _orbits;
+
+    f64_t _delete_timer = _spawn_delete_start;
+    f64_t _create_timer = _spawn_create_start;
+
+    f32_t _camera_pitch = 0;
+    f32_t _camera_yaw = 0;
 };
-struct object_circle {
-    f32_t distance;
-    f32_t anglular_offset;
-    f32_t angular_speed;
-    f32_t direction;
-    f32_t radius;
-    std::vector<rend_pair> rends;
-};
 
-
-i32_t input_x = 0;
-i32_t input_y = 0;
-
-f32_t mouse_x = 0.0f;
-f32_t mouse_y = 0.0f;
-
-f32_t scroll_y = 0.0f;
-
-void glfw_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    i32_t delta = 0;
-    i32_t* target;
-
-    switch (key) {
-    case GLFW_KEY_W: target = &input_x; delta = 1; break;
-    case GLFW_KEY_S: target = &input_x; delta = -1; break;
-    case GLFW_KEY_D: target = &input_y; delta = 1; break;
-    case GLFW_KEY_A: target = &input_y; delta = -1; break;
-    default: return;
-    }
-
-    if (action == GLFW_RELEASE) {
-        *target = 0;
-    }
-    else {
-        *target = delta;
-    }
-}
-
-void glfw_scroll_callback(GLFWwindow* window, double x, double y) {
-    scroll_y = static_cast<f32_t>(y);
-}
-
-void glfw_mouse_callback(GLFWwindow* window, double x, double y) {
-    static double prev_x = 0.0;
-    static double prev_y = 0.0;
-
-    mouse_x = static_cast<f32_t>(x - prev_x);
-    mouse_y = static_cast<f32_t>(-(y - prev_y)); // NOTE : inverted
-
-    prev_x = x;
-    prev_y = y;
-}
-
-auto create_meshes(asset::asset_registry& reg, asset::asset_resource_adapter& adapter) {
-    std::array<asset::asset_resource_adapter::index_type, mesh_names.size()> meshes;
-    for (auto i = 0u; i < meshes.size(); ++i) {
-        const auto mesh_asset_h = reg.get<asset::mesh_asset>(mesh_names[i].data()).hash;
-        meshes[i] = adapter.get_resource_index<asset::mesh_asset>(mesh_asset_h);
-    }
-    return meshes;
-}
-
-auto create_materials(asset::asset_registry& reg, asset::asset_resource_adapter& adapter) {
-    std::array<std::array<asset::asset_resource_adapter::index_type, mesh_names.size()>, shader_names.size()> materials;
-    for (auto i = 0u; i < materials.size(); ++i) {
-        const auto def_h = reg.get<asset::shader_asset>(shader_names[i].data()).hash;
-
-        if (shader_names[i] == "def_pos_inst") {
-            empty_material* material_src = new empty_material{};
-            const auto material = reg.create<asset::material_asset>(def_h, material_src).hash;
-            const auto material_h = adapter.get_resource_index<asset::material_asset, empty_material>(material);
-
-            for (auto& elem : materials[i]) {
-                elem = material_h;
+orbitals::orbitals() : dry_program{} {
+    // create materials
+    for (auto i = 0u; i < _shader_names.size(); ++i) {
+        // pos shader has different material
+        const auto shader = get_asset<asset::shader_asset>(_shader_names[i]).hash;
+        if (i == 2) {
+            empty_material material;
+            for (auto j = 0u; j < _texture_names.size(); ++j) {               
+                _materials[i][j] = construct_resource<asset::material_asset, decltype(material)>(shader, material);
             }
-        }
-        else {
-            for (auto j = 0u; j < materials[i].size(); ++j) {
-                const auto tex_asset_h = adapter.get_resource_index<asset::texture_asset>(reg.get<asset::texture_asset>(mesh_names[j].data()).hash);
 
-                textured_material* material_src = new textured_material{ tex_asset_h };
-                const auto material = reg.create<asset::material_asset>(def_h, material_src).hash;
-                materials[i][j] = adapter.get_resource_index<asset::material_asset, textured_material>(material);
+        } else {
+            for (auto j = 0u; j < _texture_names.size(); ++j) {
+                textured_material material{ create_resource<asset::texture_asset>(_texture_names[j]) };
+                _materials[i][j] = construct_resource<asset::material_asset, decltype(material)>(shader, material);
             }
+        }       
+    }
+
+    // create meshes
+    for (auto i = 0u; i < _mesh_names.size(); ++i) {
+        _meshes[i] = create_resource<asset::mesh_asset>(_mesh_names[i]);
+    }
+
+    // create orbits
+    _orbits.resize(_orbit_count);
+    for (auto i = 0u; i < _orbits.size(); ++i) {
+        _orbits[i].objects.reserve(_orbit_object_count);
+        // hardcoded settings for generation
+        _orbits[i].distance = -150.0f - 25.0f * i;
+        _orbits[i].anglular_offset = 0.76f * i;
+        _orbits[i].angular_speed = 0.02f + i * 0.005f;
+        _orbits[i].direction = (i % 2) ? -1.0f : 1.0f;
+        _orbits[i].radius = 100.0f - 2.0f * i;
+
+        for (auto j = 0u; j < _orbit_object_count; ++j) {
+            const u32_t shader_ind = _rng.shader_distr(_rng.rng);
+            const u32_t mesh_ind = _rng.mesh_distr(_rng.rng);
+
+            auto object = create_renderable(_meshes[mesh_ind], _materials[shader_ind][mesh_ind]);
+
+            const f32_t scaling_factor = _mesh_scaling_factors[mesh_ind];
+            object.trans.position = { 0, 0, _orbits[i].distance };
+            object.trans.scale = { scaling_factor, scaling_factor, scaling_factor };
+            object.trans.rotation = glm::rotate(object.trans.rotation, { 0, glm::radians(180.0f), 0 });
+
+            object.commit_transform();
+            _orbits[i].objects.push_back(std::move(object));
         }
     }
-    return materials;
 }
 
-glm::mat4 scale_matrix(float val) {
-    return glm::scale(glm::mat4{ 1.0 }, glm::vec3(val, val, val));
-};
+bool orbitals::update() {
+    _delete_timer += _delta_time;
+    _create_timer += _delta_time;
 
-void consume_mouse_delta() {
-    mouse_x = 0.0f;
-    mouse_y = 0.0f;
+    _camera.fov += _wheel_delta * _fov_speed;
+    _camera.fov = std::clamp(_camera.fov, glm::radians(5.0f), glm::radians(120.0f));
+
+    {
+        const auto camera_front = glm::normalize(glm::rotate(_camera.trans.rotation, { 0, 0, 1 }));
+        const auto camera_side = glm::normalize(glm::cross(camera_front, { 0, 1, 0 }));
+        // glm come on
+        _camera.trans.position += static_cast<f32_t>(_keyboard_axis.x * _camera_speed * _delta_time) * camera_front;
+        _camera.trans.position += static_cast<f32_t>(_keyboard_axis.y * _camera_speed * _delta_time) * camera_side;
+
+        // suboptimal rotation, learn math pls
+        constexpr f32_t pitch_limit = glm::radians(89.0f);
+        _camera_pitch += _mouse_axis.dy * _camera_sensetivity;
+        _camera_pitch = std::clamp(_camera_pitch, -pitch_limit, pitch_limit);
+        _camera_yaw += -_mouse_axis.dx * _camera_sensetivity;
+
+        const glm::quat pitch = glm::angleAxis(_camera_pitch, glm::vec3{ 1, 0, 0 });
+        const glm::quat yaw = glm::angleAxis(_camera_yaw, glm::vec3{ 0, 1, 0 });
+
+        _camera.trans.rotation = yaw * pitch;
+    }
+
+
+    if (_delete_timer >= _spawn_period) {
+        for (auto& orbit : _orbits) {
+            orbit.objects.pop_back();
+        }
+        _delete_timer = 0;
+    }
+
+    if (_create_timer >= _spawn_period) {
+        for (auto& orbit : _orbits) {
+            const u32_t shader_ind = _rng.shader_distr(_rng.rng);
+            const u32_t mesh_ind = _rng.mesh_distr(_rng.rng);
+
+            auto object = create_renderable(_meshes[mesh_ind], _materials[shader_ind][mesh_ind]);
+
+            const f32_t scaling_factor = _mesh_scaling_factors[mesh_ind];
+            object.trans.position = { 0, 0, orbit.distance };
+            object.trans.scale = { scaling_factor, scaling_factor, scaling_factor };
+            object.trans.rotation = glm::rotate(object.trans.rotation, { 0, glm::radians(180.0f), 0 });
+
+            orbit.objects.push_back(std::move(object));
+        }
+
+        _create_timer = 0;
+    }
+
+
+    for (auto& orbit : _orbits) {
+        for (auto i = 0u; i < orbit.objects.size(); ++i) {
+            auto& object = orbit.objects[i];
+
+            const f32_t angle = orbit.direction * 
+                (static_cast<f32_t>(_elapsed_time) * orbit.angular_speed + _orbit_object_angle_delta * i + orbit.anglular_offset);
+            object.trans.position = { orbit.radius * std::cosf(angle), orbit.radius * std::sinf(angle), orbit.distance };
+
+            object.commit_transform();
+        }
+    }
+    return true;
 }
 
-void consume_scroll_delta() {
-    scroll_y = 0.0f;
-}
 
 int main() {
-    // init
-    wsi::window window{ win_width, win_height };
-    vulkan_renderer vk_rend{ window };
-    asset::asset_registry asset_reg;
-    asset::asset_resource_adapter res_adapter{ asset_reg };
-    res_adapter.attach_renderer(vk_rend);
+    orbitals program;
 
-    camera_transform camera;
-
-    vk_rend.bind_camera_transform(camera);
-
-    constexpr glm::vec3 camera_up{ 0.0f, 1.0f, 0.0f };
-    glm::vec3 camera_pos{ 0.0f, 0.0f, 0.0f };
-    glm::vec3 camera_front{ 0.0f, 0.0f, 1.0f };
-    f32_t pitch = 0.0f;
-    f32_t yaw = 0.0f;
-    f32_t fov = 80.0f;
-
-    glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetKeyCallback(window.handle(), glfw_key_callback);
-    glfwSetCursorPosCallback(window.handle(), glfw_mouse_callback);
-    glfwSetScrollCallback(window.handle(), glfw_scroll_callback);
-
-    const auto meshes = create_meshes(asset_reg, res_adapter);
-    const auto materials = create_materials(asset_reg, res_adapter);
-
-    // init groups
-    std::vector<object_circle> obj_groups(circle_count);
-    for (auto i = 0u; i < obj_groups.size(); ++i) {
-        obj_groups[i].rends.resize(circle_obj_count);
-
-        obj_groups[i].distance = -150.0f - 25.0f * i;
-        obj_groups[i].anglular_offset = 0.76f * i;
-        obj_groups[i].angular_speed = 0.0000002f + i * 0.00000005f;
-        obj_groups[i].direction = (i % 2) ? -1.0f : 1.0f;
-        obj_groups[i].radius = 100.0f - 2.0f * i;
-    }
-
-    std::srand(static_cast<unsigned int>(std::time(nullptr)));
-    // spawn all
-    for (auto& group : obj_groups) {
-        for (auto& rend : group.rends) {
-            u32_t mat_ind = rand() % 3;
-            u32_t mesh_ind = rand() % 3;
-
-            rend.pos = glm::translate(glm::mat4{ 1.0f }, glm::vec3(0.0f, 0.0f, group.distance));
-            rend.scale = scale_matrix(mesh_scales[mesh_ind]);
-            rend.transform.model = glm::rotate(rend.pos, glm::radians(-90.0f), { 0.0f, 1.0f, 0.0f });
-            rend.transform.model = rend.transform.model * rend.scale;
-
-            rend.handle = vk_rend.create_renderable(materials[mat_ind][mesh_ind], meshes[mesh_ind]);
-            vk_rend.bind_renderable_transform(rend.handle, rend.transform);
-        }
-    }
-
-    u64_t t_elapsed = 0;
-    u64_t t_delete = delete_rend_start_us;
-    u64_t t_new = new_rend_start_us;
-
-    u32_t i_delete = 0;
-    u32_t i_new = 0;
-
-    // framerate array
-    u32_t curr_frame = 0;
-    std::vector<u64_t> frame_elapsed_us(512, 0);
-
-    auto t0 = std::chrono::steady_clock::now();
-    while (!window.should_close()) {
-        window.poll_events();
-
-        // time things
-        const auto t1 = std::chrono::steady_clock::now();
-        const auto dt = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-        t0 = t1;
-
-        t_elapsed += dt;
-        t_delete += dt;
-        t_new += dt;
-
-        frame_elapsed_us[curr_frame] = dt;
-        curr_frame = (curr_frame + 1) % frame_elapsed_us.size();
-
-        const f32_t dt_s = static_cast<f32_t>(dt) / 1000000.0f;
-
-        // logic
-        fov += scroll_y * scroll_speed;
-        fov = std::clamp(fov, glm::radians(5.0f), glm::radians(120.0f));
-        consume_scroll_delta();
-
-        yaw += mouse_x * camera_sensetivity;
-        pitch += mouse_y * camera_sensetivity;
-        pitch = std::clamp(pitch, glm::radians(-89.0f), glm::radians(89.0f));
-        consume_mouse_delta();
-
-        camera_pos += input_x * camera_speed * dt_s * camera_front;
-        camera_pos += input_y * camera_speed * dt_s * glm::normalize(glm::cross(camera_front, camera_up));
-
-        camera_front.x = std::cosf(yaw) * std::cosf(pitch);
-        camera_front.y = std::sinf(pitch);
-        camera_front.z = std::sinf(yaw) * std::cosf(pitch);
-        camera_front = glm::normalize(camera_front);
-
-        camera.proj = glm::perspective(fov, static_cast<f32_t>(win_width / win_height), 0.1f, 8000.0f);
-        camera.proj[1][1] *= -1;
-        camera.view = glm::lookAt(camera_pos, camera_pos + camera_front, camera_up);
-        camera.viewproj = camera.proj * camera.view;
-
-        if (t_delete >= mutate_circle_us) {
-            for (auto& group : obj_groups) {
-                vk_rend.destroy_renderable(group.rends[i_delete].handle);
-            }
-            i_delete = (i_delete + 1) % circle_obj_count;
-            t_delete = 0;
-        }
-
-        if (t_new >= mutate_circle_us) {
-            for (auto& group : obj_groups) {
-                u32_t mat_ind = rand() % materials.size();
-                u32_t mesh_ind = rand() % meshes.size();
-
-                auto& rend = group.rends[i_new];
-                rend.scale = scale_matrix(mesh_scales[mesh_ind]);
-                rend.handle = vk_rend.create_renderable(materials[mat_ind][mesh_ind], meshes[mesh_ind]);
-                vk_rend.bind_renderable_transform(rend.handle, rend.transform);
-            }
-
-            i_new = (i_new + 1) % circle_obj_count;
-            t_new = 0;
-        }
-
-        for (auto& group : obj_groups) {
-            for (auto i = 0u; i < group.rends.size(); ++i) {
-                auto& rend = group.rends[i];
-                const f32_t angle = group.direction * (t_elapsed * group.angular_speed + angle_offset * i + group.anglular_offset);
-
-                rend.transform.model = glm::translate(rend.pos,
-                    glm::vec3(group.radius * std::cosf(angle), group.radius * std::sinf(angle), 0.0f)
-                );
-                rend.transform.model = glm::rotate(rend.transform.model, glm::radians(-90.0f), { 0.0f, 1.0f, 0.0f });
-                rend.transform.model = rend.transform.model * rend.scale;
-            }
-        }
-
-        vk_rend.submit_frame();
-    }
-
-    float total = 0;
-    for (auto dt : frame_elapsed_us) {
-        total += static_cast<float>(dt);
-    }
-    total = total / (frame_elapsed_us.size() * 1000.0f);
-
-    printf("average frame time: %f ms, fps %i\n", total, static_cast<u32_t>(1000.0f / total));
-
+    program.render_loop();
     return 0;
 }

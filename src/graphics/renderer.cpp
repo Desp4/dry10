@@ -51,7 +51,7 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
         cmd_buffer = vkw::vk_cmd_buffer{ _device, _present_queue.cmd_pool() };
     }
 
-    _resources.cam_transform = &_default_cam_transform;
+    _resources.cam_transform = _default_cam_transform;
 }
 
 void vulkan_renderer::submit_frame() {
@@ -62,12 +62,9 @@ void vulkan_renderer::submit_frame() {
         u32_t object_count = 0;
         for (const auto& pipeline : _resources.pipelines) {
             for (const auto& [mesh, renderables] : pipeline.renderables) {
-                for (const auto& renderable : renderables) {
-                    mapped_instances[object_count].transform = *renderable.transform_ptr;
-                    mapped_instances[object_count].material = renderable.material;
-
-                    object_count += 1;
-                }
+                // NOTE : probably not smart enough to do a memcpy on sparse_set?
+                std::copy(renderables.begin(), renderables.end(), &mapped_instances[object_count]);
+                object_count += static_cast<u32_t>(renderables.size());
             }
         }
 
@@ -90,7 +87,7 @@ void vulkan_renderer::submit_frame() {
         _instanced_pass.instance_staging_buffer.size()
     );
 
-    _instanced_pass.camera_transforms[frame_index].write(std::span<const camera_transform>{ _resources.cam_transform, 1 });
+    _instanced_pass.camera_transforms[frame_index].write(std::span<const camera_transform>{ &_resources.cam_transform, 1 });
 
     _texarr.update_descriptors(_device, frame_index);
 

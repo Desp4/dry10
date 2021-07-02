@@ -59,7 +59,11 @@ struct material_source {
     std::shared_ptr<material_base> material; // TODO : write a wrapper, std::any in assetreg needs copy
 
     material_source() = default;
-    material_source(hash_t sh, material_base* mat) : shader{ sh }, material{ mat }{}
+    template<typename Material>
+    material_source(hash_t sh, Material&& mat) :
+        shader{ sh },
+        material{ std::make_shared<std::decay_t<Material>>(std::forward<Material>(mat)) }
+    {}
 };
 
 // extension lookup

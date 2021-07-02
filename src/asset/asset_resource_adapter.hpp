@@ -17,6 +17,7 @@ public:
     void attach_renderer(vulkan_renderer& renderer) { _renderer = &renderer; }
 
     // TODO : by name would be nice to have
+    // TODO : don't really like the overload
     template<typename Asset> requires (!std::is_same_v<Asset, material_asset>)
     index_type get_resource_index(hash_t hash);
     template<typename Asset, typename Material> requires std::is_same_v<Asset, material_asset>

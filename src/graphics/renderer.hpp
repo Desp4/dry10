@@ -30,10 +30,7 @@ struct renderer_resources {
         vkw::vk_buffer vertices;
         vkw::vk_buffer indices;
     };
-    struct renderable {
-        const object_transform* transform_ptr;
-        u32_t material;
-    };
+    using renderable = instanced_pass::instance_input;
     struct shader_pipeline {   
         vkw::vk_pipeline_graphics pipeline;
         pipeline_resources pipeline_data;
@@ -53,7 +50,7 @@ struct renderer_resources {
     // reference counters
     using refcount_array = persistent_array<u32_t>;
 
-    const camera_transform* cam_transform;
+    camera_transform cam_transform;
 };
 
 class vulkan_renderer {
@@ -79,8 +76,8 @@ public:
 
     void destroy_renderable(renderable_id rend);
 
-    void bind_renderable_transform(renderable_id rend, const object_transform& transform);
-    void bind_camera_transform(const camera_transform& cam) { _resources.cam_transform = &cam; };
+    void update_renderable_transform(renderable_id rend, const object_transform& trans);
+    void update_camera_transform(const camera_transform& trans);
 
     // TODO : public deleted resources, doing nothing currently
 
