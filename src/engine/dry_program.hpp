@@ -83,6 +83,9 @@ protected:
     template<typename T, typename Mat, typename... Ts> requires std::is_same_v<T, asset::material_asset>
     res_index construct_resource(Ts&&... args);
 
+    template<typename T>
+    void write_shader_data(res_index shader, u32_t binding, const T& value);
+
     struct {
         transform trans{ .position{0,0,0}, .scale{ 1, 1, 1}, .rotation{ 0, 0, 0, 1 } }; // scale ignored
         f32_t fov = 90;
@@ -164,6 +167,11 @@ dry_program::res_index dry_program::construct_resource(Ts&&... args) {
 template<typename T, typename Mat, typename... Ts> requires std::is_same_v<T, asset::material_asset>
 dry_program::res_index dry_program::construct_resource(Ts&&... args) {
     return create_resource<T, Mat>(create_asset<T>(std::forward<Ts>(args)...));
+}
+
+template<typename T>
+void dry_program::write_shader_data(res_index shader, u32_t binding, const T& value) {
+    _renderer.write_buffer(shader, binding, value);
 }
 
 }

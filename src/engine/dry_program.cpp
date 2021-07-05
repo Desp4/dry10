@@ -44,6 +44,9 @@ dry_program::dry_program(u32_t w, u32_t h) :
     glfwSetScrollCallback(_window.handle(), wheel_callback);
 
     _camera.aspect = static_cast<f32_t>(w) / h;
+
+    _mouse_prev_x = static_cast<f32_t>(w) / 2;
+    _mouse_prev_y = static_cast<f32_t>(h) / 2;
 }
 
 void dry_program::render_loop() {
@@ -124,6 +127,15 @@ void dry_program::wheel_callback(GLFWwindow* window, double x, double y) {
 
 void dry_program::mouse_callback(GLFWwindow* window, double x, double y) {
     dry_program& program = *reinterpret_cast<dry_program*>(glfwGetWindowUserPointer(window));
+
+    // TODO : to plug sudden jumps, something nicer eh?
+    static bool first_call = true;
+    if (first_call) {
+        program._mouse_prev_x = static_cast<f32_t>(x);
+        program._mouse_prev_y = static_cast<f32_t>(y);
+        first_call = false;
+        return;
+    }
 
     program._mouse_axis.dx = static_cast<f32_t>(x - program._mouse_prev_x);
     program._mouse_axis.dy = static_cast<f32_t>(y - program._mouse_prev_y);

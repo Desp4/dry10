@@ -31,7 +31,7 @@ public:
     template<typename T>
     void write_to_buffer(u32_t frame, u32_t binding, const std::vector<T>& values);
     template<typename T>
-    void write_to_bffer(u32_t frame, u32_t binding, std::span<const T> values);
+    void write_to_buffer(u32_t frame, u32_t binding, std::span<const T> values);
 
     template<typename T>
     T* buffer_data(u32_t frame, u32_t binding);
@@ -93,7 +93,7 @@ void pipeline_resources::write_to_buffer(u32_t frame, u32_t binding, const std::
     write_to_buffer(frame, binding, std::span{ values.begin(), values.end() });
 }
 template<typename T>
-void pipeline_resources::write_to_bffer(u32_t frame, u32_t binding, std::span<const T> values) {
+void pipeline_resources::write_to_buffer(u32_t frame, u32_t binding, std::span<const T> values) {
     std::copy(values.begin(), values.end(), buffer_data<T>(frame, binding));
 }
 

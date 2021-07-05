@@ -145,7 +145,7 @@ void pipeline_resources::create_ubos(assure_input& input_ctx, std::span<const sh
     }
 
     input_ctx.resources.push_back(std::move(buffer_infos));
-    input_ctx.pool_sizes.emplace_back(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<u32_t>(bindings.size()));
+    input_ctx.pool_sizes.emplace_back(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<u32_t>(bindings.size() * _frame_count));
 }
 
 void pipeline_resources::create_ssbos(assure_input& input_ctx, std::span<const shader_layout_info> bindings) {

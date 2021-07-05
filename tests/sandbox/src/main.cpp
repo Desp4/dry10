@@ -23,12 +23,13 @@ public:
 class orbitals : public dry_program {
 public:
     orbitals();
+    ~orbitals();
 
     bool update() override;
 
 private:
     // assets
-    static constexpr std::array _shader_names{ "def_tex_inst", "def_inv_inst", "def_pos_inst" };
+    static constexpr std::array _shader_names{ "unlit_tex", "unlit_tex_inv", "unlit_normal", "lit_tex"};
     static constexpr std::array _mesh_names{ "volga", "viking_room", "granite" };
     static constexpr std::array _texture_names = _mesh_names;
     static constexpr std::array _mesh_scaling_factors{ 1.0f, 0.02f , 1.0f };
@@ -45,6 +46,13 @@ private:
     static constexpr f32_t _camera_speed = 75.0f;
     static constexpr f32_t _camera_sensetivity = 0.01f;
 
+    // shader
+    struct light_source {
+        alignas(16) glm::vec3 position;
+        alignas(16) glm::vec3 color;
+    };
+
+    static constexpr light_source _lit_light_source{ .position{ 0, 0, -200 }, .color{ 1.0f, 0.2f, 1.0f } };
     struct object_orbit {
         std::vector<renderable> objects;
         f32_t distance;
@@ -61,7 +69,7 @@ private:
         std::uniform_int_distribution<u32_t> shader_distr{ 0, static_cast<u32_t>(_shader_names.size() - 1) };
     } _rng;
 
-    std::array<std::array<res_index, _shader_names.size()>, _texture_names.size()> _materials;
+    std::array<std::array<res_index, _texture_names.size()>, _shader_names.size()> _materials;
     std::array<res_index, _mesh_names.size()> _meshes;
 
     std::vector<object_orbit> _orbits;
@@ -71,6 +79,9 @@ private:
 
     f32_t _camera_pitch = 0;
     f32_t _camera_yaw = 0;
+
+    std::vector<f64_t> _frame_times;
+    u32_t _frame_time_ind = 0;
 };
 
 orbitals::orbitals() : dry_program{} {
@@ -91,6 +102,8 @@ orbitals::orbitals() : dry_program{} {
             }
         }       
     }
+    // upload uniform for lit
+    write_shader_data(create_resource<asset::shader_asset>(_shader_names[3]), 1, _lit_light_source);
 
     // create meshes
     for (auto i = 0u; i < _mesh_names.size(); ++i) {
@@ -123,9 +136,25 @@ orbitals::orbitals() : dry_program{} {
             _orbits[i].objects.push_back(std::move(object));
         }
     }
+
+    _camera_yaw = glm::radians(180.0f);
+
+    _frame_times.resize(512, 0);
+}
+
+orbitals::~orbitals() {
+    f64_t total = 0;
+    for (auto time : _frame_times) {
+        total += time;
+    }
+    const f32_t frame_time = static_cast<f32_t>(total / _frame_times.size());
+    printf("average over %zi frames %fms (%ffps)\n", _frame_times.size(), frame_time * 1000, 1.0f / frame_time);
 }
 
 bool orbitals::update() {
+    _frame_times[_frame_time_ind] = _delta_time;
+    _frame_time_ind = (_frame_time_ind + 1) % _frame_times.size();
+
     _delete_timer += _delta_time;
     _create_timer += _delta_time;
 

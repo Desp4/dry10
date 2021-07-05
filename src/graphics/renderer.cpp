@@ -51,6 +51,8 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
         cmd_buffer = vkw::vk_cmd_buffer{ _device, _present_queue.cmd_pool() };
     }
 
+    _buffer_write_queues.resize(_image_count);
+
     _resources.cam_transform = _default_cam_transform;
 }
 
@@ -78,6 +80,14 @@ void vulkan_renderer::submit_frame() {
 
     vkResetCommandBuffer(cmd_buffer_h, 0);
     _render_pass.start_cmd_pass(cmd_buffer, frame_index);
+
+    // submit buffer jobs
+    {
+        for (const auto& job : _buffer_write_queues[frame_index]) {
+            _resources.pipelines[job.pipeline].pipeline_data.write_to_buffer(frame_index, job.binding, job.data);
+        }
+        _buffer_write_queues[frame_index].resize(0);
+    }
 
     // === instanced pass ===
 

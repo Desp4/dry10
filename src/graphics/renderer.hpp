@@ -79,7 +79,12 @@ public:
     void update_renderable_transform(renderable_id rend, const object_transform& trans);
     void update_camera_transform(const camera_transform& trans);
 
-    // TODO : public deleted resources, doing nothing currently
+    template<typename T>
+    void write_buffer(resource_id pipeline, u32_t binding, const T& value);
+    template<typename T>
+    void write_buffer(resource_id pipeline, u32_t binding, const std::vector<T>& values);
+    template<typename T>
+    void write_buffer(resource_id pipeline, u32_t binding, std::span<const T> values);
 
 private:
     friend class pipeline_base;
@@ -91,6 +96,11 @@ private:
     struct populated_queue_info {
         std::array<queue_family_info, 3> queue_init_infos;
         std::vector<vkw::queue_info> device_queue_infos;
+    };
+    struct buffer_write_job {
+        std::vector<std::byte> data;
+        resource_id pipeline;
+        u32_t binding;
     };
 
     // init functions
@@ -123,6 +133,8 @@ private:
     instanced_pass _instanced_pass;
 
     texture_array _texarr;
+
+    std::vector<std::vector<buffer_write_job>> _buffer_write_queues;
 
     u32_t _image_count;
     VkExtent2D _extent;
@@ -169,6 +181,25 @@ vulkan_renderer::resource_id vulkan_renderer::create_material(resource_id pipeli
     }
 
     return static_cast<resource_id>(ind);
+}
+
+template<typename T>
+void vulkan_renderer::write_buffer(resource_id pipeline, u32_t binding, const T& value) {
+    write_buffer(pipeline, binding, std::span{ &value, 1 });
+}
+template<typename T>
+void vulkan_renderer::write_buffer(resource_id pipeline, u32_t binding, const std::vector<T>& values) {
+    write_buffer(pipeline, binding, std::span{ values.begin(), values.end() });
+}
+template<typename T>
+void vulkan_renderer::write_buffer(resource_id pipeline, u32_t binding, std::span<const T> values) {
+    for (auto& frame_jobs : _buffer_write_queues) {
+        buffer_write_job job{ .pipeline = pipeline, .binding = binding };
+        job.data.resize(values.size_bytes());
+        std::copy(values.begin(), values.end(), reinterpret_cast<T*>(job.data.data()));
+
+        frame_jobs.push_back(std::move(job));
+    }
 }
 
 }

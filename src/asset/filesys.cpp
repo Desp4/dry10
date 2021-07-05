@@ -273,7 +273,7 @@ std::optional<byte_vec> filesystem::read_file(hash_t hash) {
 
 std::optional<filesystem::asset_dab_location> filesystem::consume_hash(hash_t hash) const {
     auto dab_it = std::lower_bound(_dab_files.begin(), _dab_files.end(), hash,
-        [](const dab_arch_data& el, hash_t hash) { return el.start_hash < hash;}
+        [](const dab_arch_data& el, hash_t hash) { return el.start_hash <= hash; }
     );
 
     if (dab_it == _dab_files.end() && _dab_files.size() == 0) {
