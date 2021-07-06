@@ -3,6 +3,8 @@
 #ifndef DRY_ENGINE_DRY_PROGRAM_H
 #define DRY_ENGINE_DRY_PROGRAM_H
 
+#include <bitset>
+
 #include <glm/gtx/quaternion.hpp>
 
 #include "graphics/renderer.hpp"
@@ -97,15 +99,12 @@ protected:
     f64_t _delta_time;
 
     // input
-    struct {
-        f32_t x = 0;
-        f32_t y = 0;
-    } _keyboard_axis;
+    std::bitset<GLFW_KEY_LAST> _keyboard_input;
 
     struct {
         f32_t dx = 0;
         f32_t dy = 0;
-    } _mouse_axis;
+    } _mouse_input;
 
     f32_t _wheel_delta = 0;
 

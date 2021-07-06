@@ -65,7 +65,7 @@ void vulkan_renderer::submit_frame() {
         u32_t object_count = 0;
         for (const auto& pipeline : _resources.pipelines) {
             for (const auto& [mesh, renderables] : pipeline.renderables) {
-                // NOTE : probably not smart enough to do a memcpy on sparse_set?
+                // NOTE : std::copy is probably not smart enough to do a memcpy on sparse_set?
                 std::copy(renderables.begin(), renderables.end(), &mapped_instances[object_count]);
                 object_count += static_cast<u32_t>(renderables.size());
             }
@@ -96,6 +96,8 @@ void vulkan_renderer::submit_frame() {
     _instanced_pass.camera_transforms[frame_index].write(std::span<const camera_transform>{ &_resources.cam_transform, 1 });
 
     _texarr.update_descriptors(_device, frame_index);
+
+    // === recording ===
 
     u32_t object_count = 0;
     constexpr std::array<VkDeviceSize, 1> offsets{ 0 };

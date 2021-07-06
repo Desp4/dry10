@@ -71,8 +71,8 @@ void dry_program::render_loop() {
         update_camera();
 
         // clear input
-        _mouse_axis.dx = 0;
-        _mouse_axis.dy = 0;
+        _mouse_input.dx = 0;
+        _mouse_input.dy = 0;
         _wheel_delta = 0;
 
         _renderer.submit_frame();
@@ -110,13 +110,8 @@ void dry_program::update_camera() {
 void dry_program::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     dry_program& program = *reinterpret_cast<dry_program*>(glfwGetWindowUserPointer(window));
 
-    switch (key) {
-    case GLFW_KEY_W: program._keyboard_axis.x = (action == GLFW_RELEASE ? 0.0f : 1.0f); break;
-    case GLFW_KEY_S: program._keyboard_axis.x = (action == GLFW_RELEASE ? 0.0f : -1.0f); break;
-    case GLFW_KEY_D: program._keyboard_axis.y = (action == GLFW_RELEASE ? 0.0f : 1.0f); break;
-    case GLFW_KEY_A: program._keyboard_axis.y = (action == GLFW_RELEASE ? 0.0f : -1.0f); break;
-    default: return;
-    }
+    const bool key_value = (action != GLFW_RELEASE);
+    program._keyboard_input.set(key, key_value);
 }
 
 void dry_program::wheel_callback(GLFWwindow* window, double x, double y) {
@@ -137,8 +132,8 @@ void dry_program::mouse_callback(GLFWwindow* window, double x, double y) {
         return;
     }
 
-    program._mouse_axis.dx = static_cast<f32_t>(x - program._mouse_prev_x);
-    program._mouse_axis.dy = static_cast<f32_t>(y - program._mouse_prev_y);
+    program._mouse_input.dx = static_cast<f32_t>(x - program._mouse_prev_x);
+    program._mouse_input.dy = static_cast<f32_t>(y - program._mouse_prev_y);
 
     program._mouse_prev_x = static_cast<f32_t>(x);
     program._mouse_prev_y = static_cast<f32_t>(y);

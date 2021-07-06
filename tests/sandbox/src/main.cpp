@@ -164,15 +164,17 @@ bool orbitals::update() {
     {
         const auto camera_front = glm::normalize(glm::rotate(_camera.trans.rotation, { 0, 0, 1 }));
         const auto camera_side = glm::normalize(glm::cross(camera_front, { 0, 1, 0 }));
+        const f32_t mouse_x = _keyboard_input.test(GLFW_KEY_W) - _keyboard_input.test(GLFW_KEY_S);
+        const f32_t mouse_y = _keyboard_input.test(GLFW_KEY_D) - _keyboard_input.test(GLFW_KEY_A);
         // glm come on
-        _camera.trans.position += static_cast<f32_t>(_keyboard_axis.x * _camera_speed * _delta_time) * camera_front;
-        _camera.trans.position += static_cast<f32_t>(_keyboard_axis.y * _camera_speed * _delta_time) * camera_side;
+        _camera.trans.position += static_cast<f32_t>(mouse_x * _camera_speed * _delta_time) * camera_front;
+        _camera.trans.position += static_cast<f32_t>(mouse_y * _camera_speed * _delta_time) * camera_side;
 
         // suboptimal rotation, learn math pls
         constexpr f32_t pitch_limit = glm::radians(89.0f);
-        _camera_pitch += _mouse_axis.dy * _camera_sensetivity;
+        _camera_pitch += _mouse_input.dy * _camera_sensetivity;
         _camera_pitch = std::clamp(_camera_pitch, -pitch_limit, pitch_limit);
-        _camera_yaw += -_mouse_axis.dx * _camera_sensetivity;
+        _camera_yaw += -_mouse_input.dx * _camera_sensetivity;
 
         const glm::quat pitch = glm::angleAxis(_camera_pitch, glm::vec3{ 1, 0, 0 });
         const glm::quat yaw = glm::angleAxis(_camera_yaw, glm::vec3{ 0, 1, 0 });
