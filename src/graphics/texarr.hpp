@@ -5,7 +5,7 @@
 
 #include "asset/vk_reflect.hpp"
 
-#include "vkw/queue/queue_graphics.hpp"
+#include "vkw/queue/queue.hpp"
 #include "vkw/desc/desclayout.hpp"
 #include "vkw/desc/descpool.hpp"
 #include "vkw/texsampler.hpp"
@@ -49,7 +49,7 @@ struct texture_array {
     static constexpr std::array layout_bindings{ sampler_layout_binding, texarr_layout_binding };
 };
 
-texture_array create_texture_array(const vkw::vk_device& device, const vkw::vk_queue_graphics& graphics_queue, u32_t frame_count);
+texture_array create_texture_array(const vkw::vk_device& device, const vkw::vk_queue& graphics_queue, u32_t frame_count);
 
 }
 

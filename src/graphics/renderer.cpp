@@ -9,6 +9,7 @@
 
 #include "vkw/device/vk_functions.hpp"
 #include "vk_initers.hpp"
+#include "vkw/queue/queue_fun.hpp"
 
 namespace dry {
 
@@ -20,9 +21,11 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
     const auto queue_infos = populate_queue_infos(phys_device);
     _device = vkw::vk_device{ instance, phys_device, queue_infos.device_queue_infos, _device_extensions, _device_features };
 
-    _present_queue = vkw::vk_queue{ _device, queue_infos.queue_init_infos[0].family_ind, queue_infos.queue_init_infos[0].queue_ind };
-    _graphics_queue = vkw::vk_queue_graphics{ _device, queue_infos.queue_init_infos[1].family_ind, queue_infos.queue_init_infos[1].queue_ind };
-    _transfer_queue = vkw::vk_queue_transfer{ _device, queue_infos.queue_init_infos[2].family_ind, queue_infos.queue_init_infos[2].queue_ind };
+    constexpr VkCommandPoolCreateFlags worker_pool_flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    constexpr VkCommandPoolCreateFlags present_pool_flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    _present_queue = vkw::vk_queue{ _device, queue_infos.queue_init_infos[0].family_ind, queue_infos.queue_init_infos[0].queue_ind, present_pool_flags };
+    _graphics_queue = vkw::vk_queue{ _device, queue_infos.queue_init_infos[1].family_ind, queue_infos.queue_init_infos[1].queue_ind, worker_pool_flags };
+    _transfer_queue = vkw::vk_queue{ _device, queue_infos.queue_init_infos[2].family_ind, queue_infos.queue_init_infos[2].queue_ind, worker_pool_flags };
 
     const auto surface_capabilities = _device.surface_capabilities(_surface.handle());
     _image_count = surface_capabilities.maxImageCount == 0 ?
@@ -48,10 +51,8 @@ vulkan_renderer::vulkan_renderer(const wsi::window& window) {
 
     _cmd_buffers.resize(_image_count);
     for (auto& cmd_buffer : _cmd_buffers) {
-        cmd_buffer = vkw::vk_cmd_buffer{ _device, _present_queue.cmd_pool() };
+        cmd_buffer = _present_queue.create_buffer();
     }
-
-    _buffer_write_queues.resize(_image_count);
 
     _resources.cam_transform = _default_cam_transform;
 }
@@ -81,21 +82,16 @@ void vulkan_renderer::submit_frame() {
     vkResetCommandBuffer(cmd_buffer_h, 0);
     _render_pass.start_cmd_pass(cmd_buffer, frame_index);
 
-    // submit buffer jobs
-    {
-        for (const auto& job : _buffer_write_queues[frame_index]) {
-            _resources.pipelines[job.pipeline].pipeline_data.write_to_buffer(frame_index, job.binding, job.data);
-        }
-        _buffer_write_queues[frame_index].resize(0);
-    }
+    // === instance transfer ===
 
-    // === instanced pass ===
-
-    // TODO : can be async, need interface
-    _transfer_queue.copy_buffer(
-        _instanced_pass.instance_staging_buffer.handle(), _instanced_pass.instance_buffers[frame_index].handle(),
-        _instanced_pass.instance_staging_buffer.size()
+    const auto instance_transfer_cmd = _transfer_queue.create_buffer();
+    instance_transfer_cmd.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    vkw::copy_buffer(instance_transfer_cmd, _instanced_pass.instance_staging_buffer.handle(),
+        _instanced_pass.instance_buffers[frame_index].handle(), _instanced_pass.instance_staging_buffer.size()
     );
+    _transfer_queue.submit(instance_transfer_cmd);
+
+    // === misc transfers and updates ===
 
     _instanced_pass.camera_transforms[frame_index].write(std::span<const camera_transform>{ &_resources.cam_transform, 1 });
 
@@ -104,10 +100,15 @@ void vulkan_renderer::submit_frame() {
     u32_t object_count = 0;
     constexpr std::array<VkDeviceSize, 1> offsets{ 0 };
 
+    // TODO : if no transfer, this new buffer and begin is for nothing
+    const auto ubo_transfer_cmd = _transfer_queue.create_buffer();
+    ubo_transfer_cmd.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    bool ubo_transfer_present = false;
+
     for (auto& pipeline : _resources.pipelines) {
         // check if material buffers are up to date, don't like it TODO :
         if (pipeline.pipeline_data.has_materials() && !pipeline.material_update_status[frame_index]) {
-            auto* material_buffer = pipeline.pipeline_data.buffer_data<std::byte>(frame_index, pipeline_resources::material_ssbo_location);
+            auto* material_buffer = pipeline.pipeline_data.ssbo_data(frame_index, pipeline_resources::material_ssbo_location);
             const auto material_stride = pipeline.pipeline_data.material_stride();
 
             for (const auto material : pipeline.material_inds) {
@@ -117,7 +118,14 @@ void vulkan_renderer::submit_frame() {
 
             pipeline.material_update_status[frame_index] = true;
         }
-        
+        // check ubo updates
+        if (pipeline.pending_ubo_transfers != 0) {
+            pipeline.pipeline_data.transfer_staging_ubos(ubo_transfer_cmd, frame_index);
+            ubo_transfer_present = true;
+
+            pipeline.pending_ubo_transfers -= 1;
+        }
+
         pipeline.pipeline.bind_pipeline(cmd_buffer_h);
 
         // bind unshaded pass descriptors, NOTE : iirc if changing pipelines they stay bound, so redundant possibly?
@@ -153,7 +161,11 @@ void vulkan_renderer::submit_frame() {
     vkCmdEndRenderPass(cmd_buffer_h);
     vkEndCommandBuffer(cmd_buffer_h);
 
-    // TODO : wait for asyncs here
+    // TODO : perhaps can move collect a bit later in swapchain/use fences?(if so probably negligible)
+    if (ubo_transfer_present) {
+        _transfer_queue.submit(ubo_transfer_cmd);
+    }
+    _transfer_queue.collect();
 
     _swapchain.submit_frame(_present_queue.handle(), frame_index, cmd_buffer_h);
 }

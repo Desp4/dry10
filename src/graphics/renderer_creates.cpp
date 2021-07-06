@@ -1,5 +1,7 @@
 #include "renderer.hpp"
 
+#include "vkw/queue/queue_fun.hpp"
+
 namespace dry {
 
 template<u32_t Set>
@@ -39,10 +41,13 @@ vulkan_renderer::resource_id vulkan_renderer::create_texture(const asset::textur
 vulkan_renderer::resource_id vulkan_renderer::create_mesh(const asset::mesh_asset& mesh) {
     renderer_resources::vertex_buffer mesh_buffer;
     // TODO : buffer for each mesh currently, do: allocate into one and offset into it
-    mesh_buffer.indices = _transfer_queue.create_local_buffer(std::span{ mesh.indices }, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    mesh_buffer.vertices = _transfer_queue.create_local_buffer(std::span{ mesh.vertices }, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    mesh_buffer.indices = vkw::create_local_buffer(_transfer_queue, _device,
+        std::span{ mesh.indices }, VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+    );
+    mesh_buffer.vertices = vkw::create_local_buffer(_transfer_queue, _device, 
+        std::span{ mesh.vertices }, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+    );
 
-    // _resources.vertex_refcount.emplace(0);
     return static_cast<resource_id>(_resources.vertex_buffers.emplace(std::move(mesh_buffer)));
 }
 

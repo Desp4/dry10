@@ -39,7 +39,9 @@ struct renderer_resources {
         std::unordered_map<resource_id, sparse_set<renderable>> renderables;
 
         sparse_set<resource_id> material_inds; // TODO : too much redundant info
+        // update statuses, getting cluttered TODO :
         std::vector<bool> material_update_status;
+        u8_t pending_ubo_transfers = 0;
     };
     
     persistent_array<vertex_buffer> vertex_buffers;
@@ -80,11 +82,7 @@ public:
     void update_camera_transform(const camera_transform& trans);
 
     template<typename T>
-    void write_buffer(resource_id pipeline, u32_t binding, const T& value);
-    template<typename T>
-    void write_buffer(resource_id pipeline, u32_t binding, const std::vector<T>& values);
-    template<typename T>
-    void write_buffer(resource_id pipeline, u32_t binding, std::span<const T> values);
+    T& get_ubo(resource_id pipeline, u32_t binding);
 
 private:
     friend class pipeline_base;
@@ -96,11 +94,6 @@ private:
     struct populated_queue_info {
         std::array<queue_family_info, 3> queue_init_infos;
         std::vector<vkw::queue_info> device_queue_infos;
-    };
-    struct buffer_write_job {
-        std::vector<std::byte> data;
-        resource_id pipeline;
-        u32_t binding;
     };
 
     // init functions
@@ -123,8 +116,8 @@ private:
     vkw::vk_render_pass _render_pass;
 
     vkw::vk_queue _present_queue;
-    vkw::vk_queue_graphics _graphics_queue;
-    vkw::vk_queue_transfer _transfer_queue;
+    vkw::vk_queue _graphics_queue;
+    vkw::vk_queue _transfer_queue;
 
     std::vector<vkw::vk_cmd_buffer> _cmd_buffers;
 
@@ -133,8 +126,6 @@ private:
     instanced_pass _instanced_pass;
 
     texture_array _texarr;
-
-    std::vector<std::vector<buffer_write_job>> _buffer_write_queues;
 
     u32_t _image_count;
     VkExtent2D _extent;
@@ -184,22 +175,10 @@ vulkan_renderer::resource_id vulkan_renderer::create_material(resource_id pipeli
 }
 
 template<typename T>
-void vulkan_renderer::write_buffer(resource_id pipeline, u32_t binding, const T& value) {
-    write_buffer(pipeline, binding, std::span{ &value, 1 });
-}
-template<typename T>
-void vulkan_renderer::write_buffer(resource_id pipeline, u32_t binding, const std::vector<T>& values) {
-    write_buffer(pipeline, binding, std::span{ values.begin(), values.end() });
-}
-template<typename T>
-void vulkan_renderer::write_buffer(resource_id pipeline, u32_t binding, std::span<const T> values) {
-    for (auto& frame_jobs : _buffer_write_queues) {
-        buffer_write_job job{ .pipeline = pipeline, .binding = binding };
-        job.data.resize(values.size_bytes());
-        std::copy(values.begin(), values.end(), reinterpret_cast<T*>(job.data.data()));
-
-        frame_jobs.push_back(std::move(job));
-    }
+T& vulkan_renderer::get_ubo(resource_id pipeline, u32_t binding) {
+    auto& pipeline_el =  _resources.pipelines[pipeline];
+    pipeline_el.pending_ubo_transfers = _image_count;
+    return *pipeline_el.pipeline_data.ubo_data<T>(binding);
 }
 
 }

@@ -84,7 +84,7 @@ protected:
     res_index construct_resource(Ts&&... args);
 
     template<typename T>
-    void write_shader_data(res_index shader, u32_t binding, const T& value);
+    T& get_shader_ubo(res_index shader, u32_t binding);
 
     struct {
         transform trans{ .position{0,0,0}, .scale{ 1, 1, 1}, .rotation{ 0, 0, 0, 1 } }; // scale ignored
@@ -170,8 +170,8 @@ dry_program::res_index dry_program::construct_resource(Ts&&... args) {
 }
 
 template<typename T>
-void dry_program::write_shader_data(res_index shader, u32_t binding, const T& value) {
-    _renderer.write_buffer(shader, binding, value);
+T& dry_program::get_shader_ubo(res_index shader, u32_t binding) {
+    return _renderer.get_ubo<T>(shader, binding);
 }
 
 }

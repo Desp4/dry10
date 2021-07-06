@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "vk_initers.hpp"
+#include "vkw/queue/queue_fun.hpp"
 
 namespace dry {
 
@@ -56,12 +57,17 @@ pipeline_resources::pipeline_resources(const vkw::vk_device& device, u32_t frame
 
 
 pipeline_resources::~pipeline_resources() {
-    for (const auto& ubo : _ubos) {
-        ubo.unmap();
+    if (_staging_ubo.buffer.handle() != VK_NULL_HANDLE) {
+        _staging_ubo.buffer.unmap();
     }
+
     for (const auto& ssbo : _ssbos) {
         ssbo.unmap();
     }
+}
+
+void pipeline_resources::transfer_staging_ubos(const vkw::vk_cmd_buffer& cmd, u32_t frame) {
+    vkw::copy_buffer(cmd, _staging_ubo.buffer.handle(), _ubos[frame].handle(), _staging_ubo.buffer.size());
 }
 
 void pipeline_resources::bind_resources(u32_t frame, VkCommandBuffer cmd_buffer, VkPipelineLayout layout) const {
@@ -88,17 +94,6 @@ void pipeline_resources::assure_material_ssbo(std::span<const shader_layout_info
     _material_data_stride = it->stride;
 }
 
-void pipeline_resources::assure_buffer_location_map_size(std::span<const shader_layout_info> bindings) {
-    auto max_binding_lambda = [](const shader_layout_info& l, const shader_layout_info& r) {
-        return l.binding < r.binding;
-    };
-
-    const u32_t max_location = _frame_count * (1 + std::max_element(bindings.begin(), bindings.end(), max_binding_lambda)->binding);
-    if (max_location > _buffer_location_map.size()) {
-        _buffer_location_map.resize(max_location);
-    }
-}
-
 void pipeline_resources::create_ubos(assure_input& input_ctx, std::span<const shader_layout_info> bindings) {
     if (bindings.size() == 0) {
         return;
@@ -109,16 +104,25 @@ void pipeline_resources::create_ubos(assure_input& input_ctx, std::span<const sh
         combined_size += binding.stride * binding.count;
     }
 
-    std::vector<std::byte*> mapped_ptrs;
-    mapped_ptrs.reserve(_frame_count);
     _ubos.reserve(_frame_count);
 
     for (auto& frame_descs : input_ctx.frame_descriptors) {
-        _ubos.emplace_back(*_device, combined_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        mapped_ptrs.emplace_back(_ubos.back().map<std::byte>());
+        _ubos.emplace_back(*_device, combined_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
     }
 
-    assure_buffer_location_map_size(bindings);
+    _staging_ubo.buffer = vkw::vk_buffer(*_device, combined_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    _staging_ubo.data = _staging_ubo.buffer.map<std::byte>();
+
+    // assure ubo map size
+    {
+        auto max_binding_lambda = [](const shader_layout_info& l, const shader_layout_info& r) {
+            return l.binding < r.binding;
+        };
+
+        const u32_t max_location = 1 + std::max_element(bindings.begin(), bindings.end(), max_binding_lambda)->binding;
+        _ubo_location_map.resize(max_location);
+    }
+
     auto buffer_infos = std::make_unique<VkDescriptorBufferInfo[]>(_frame_count * bindings.size());
     u32_t it = 0;    
     u32_t offset = 0;
@@ -135,12 +139,9 @@ void pipeline_resources::create_ubos(assure_input& input_ctx, std::span<const sh
             desc_write.pBufferInfo = &buffer_infos[it];
             input_ctx.frame_descriptors[i].push_back(desc_write);
 
-            auto& buffer_loc = _buffer_location_map[binding.binding * _frame_count + i];
-            buffer_loc.dst = mapped_ptrs[i];
-            buffer_loc.offset = offset;
-
             ++it;
         }
+        _ubo_location_map[binding.binding] = offset;
         offset += buffer_range;
     }
 
@@ -158,7 +159,16 @@ void pipeline_resources::create_ssbos(assure_input& input_ctx, std::span<const s
     _ssbos.reserve(bindings.size() * _frame_count);
     auto buffer_infos = std::make_unique<VkDescriptorBufferInfo[]>(_frame_count * bindings.size());
 
-    assure_buffer_location_map_size(bindings);
+    // assure ssbo map size
+    {
+        auto max_binding_lambda = [](const shader_layout_info& l, const shader_layout_info& r) {
+            return l.binding < r.binding;
+        };
+
+        const u32_t max_location = _frame_count * (1 + std::max_element(bindings.begin(), bindings.end(), max_binding_lambda)->binding);
+        _ssbo_location_map.resize(max_location);
+    }
+
     u32_t it = 0;
 
     for (const auto& binding : bindings) {
@@ -175,9 +185,7 @@ void pipeline_resources::create_ssbos(assure_input& input_ctx, std::span<const s
             desc_write.pBufferInfo = &buffer_infos[it];
             input_ctx.frame_descriptors[i].push_back(desc_write);
 
-            auto& buffer_loc = _buffer_location_map[binding.binding * _frame_count + i];
-            buffer_loc.dst = _ssbos.back().map<std::byte>();
-            buffer_loc.offset = 0;
+            _ssbo_location_map[binding.binding * _frame_count + i] = _ssbos.back().map<std::byte>();
 
             ++it;
         }

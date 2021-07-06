@@ -5,8 +5,7 @@
 
 #include "asset/vk_reflect.hpp"
 
-#include "vkw/queue/queue_graphics.hpp"
-#include "vkw/queue/queue_transfer.hpp"
+#include "vkw/queue/queue.hpp"
 #include "vkw/image/imageviewpair.hpp"
 
 namespace dry {
@@ -20,7 +19,7 @@ struct vk_vertex_input {
 vk_vertex_input vertex_bindings_to_input(std::vector<asset::vk_shader_data::vertex_binding_info> bindings);
 
 vkw::vk_image_view_pair create_sampled_texture(const vkw::vk_device& device,
-    const vkw::vk_queue_graphics& g_queue, const vkw::vk_queue_transfer& t_queue, const_byte_span data,
+    const vkw::vk_queue& g_queue, const vkw::vk_queue& t_queue, const_byte_span data,
     VkExtent2D dimensions, u32_t mip_lvls, VkFormat img_format
 );
 

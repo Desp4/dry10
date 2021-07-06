@@ -3,9 +3,11 @@
 #ifndef DRY_VK_CMDBUFFER_H
 #define DRY_VK_CMDBUFFER_H
 
-#include "cmdpool.hpp"
+#include "vkw/device/device.hpp"
 
 namespace dry::vkw {
+
+class vk_cmd_pool;
 
 class vk_cmd_buffer {
 public:

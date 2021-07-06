@@ -40,6 +40,9 @@ vk_buffer& vk_buffer::operator=(vk_buffer&& oth) noexcept {
     _true_size = oth._true_size;
     // null
     oth._device = nullptr;
+    // TODO : need this for validity checks, consider adding to others
+    // and a generic function that checks if given type instance is valid
+    oth._buffer = VK_NULL_HANDLE;
     return *this;
 }
 

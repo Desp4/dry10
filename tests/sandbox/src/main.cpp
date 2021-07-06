@@ -103,7 +103,7 @@ orbitals::orbitals() : dry_program{} {
         }       
     }
     // upload uniform for lit
-    write_shader_data(create_resource<asset::shader_asset>(_shader_names[3]), 1, _lit_light_source);
+    get_shader_ubo<light_source>(create_resource<asset::shader_asset>(_shader_names[3]), 1) = _lit_light_source;
 
     // create meshes
     for (auto i = 0u; i < _mesh_names.size(); ++i) {

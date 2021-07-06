@@ -1,6 +1,7 @@
 #include "texarr.hpp"
 
 #include "util/util.hpp"
+#include "vkw/queue/queue_fun.hpp"
 #include "vk_initers.hpp"
 
 namespace dry {
@@ -29,7 +30,7 @@ void texture_array::update_descriptors(const vkw::vk_device& device, u32_t frame
     texture_update_status[frame] = true;
 }
 
-texture_array create_texture_array(const vkw::vk_device& device, const vkw::vk_queue_graphics& graphics_queue, u32_t frame_count) {
+texture_array create_texture_array(const vkw::vk_device& device, const vkw::vk_queue& graphics_queue, u32_t frame_count) {
     texture_array texarr;
     
     constexpr VkExtent2D dummy_extent{ 4, 4 };
@@ -49,7 +50,9 @@ texture_array create_texture_array(const vkw::vk_device& device, const vkw::vk_q
         device, dummy_extent, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_SAMPLED_BIT, VMA_MEMORY_USAGE_GPU_ONLY, VK_IMAGE_ASPECT_COLOR_BIT
     };
-    graphics_queue.transition_image_layout(texarr.dummy_image.image(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkw::execute_cmd_once<vkw::transition_image_layout>(graphics_queue, texarr.dummy_image.image(),
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    );
 
     texarr.texture_update_status.resize(texture_array::array_size, true);
     texarr.texture_array_infos.resize(texture_array::array_size, VkDescriptorImageInfo{

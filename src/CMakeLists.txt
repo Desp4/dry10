@@ -24,8 +24,7 @@ set(VKW_SOURCES
     vkw/image/image.cpp
     vkw/image/imageview.cpp
     vkw/queue/queue.cpp
-    vkw/queue/queue_graphics.cpp
-    vkw/queue/queue_transfer.cpp
+    vkw/queue/queue_fun.cpp
     vkw/shader/shader.cpp)
 
 set(WINDOW_SOURCES

@@ -1,5 +1,7 @@
 #include "cmdbuffer.hpp"
 
+#include "cmdpool.hpp"
+
 namespace dry::vkw {
 
 vk_cmd_buffer::vk_cmd_buffer(const vk_device& device, const vk_cmd_pool& pool) :

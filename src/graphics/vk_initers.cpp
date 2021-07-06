@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "vkw/queue/queue_fun.hpp"
+
 namespace dry {
 
 vk_vertex_input vertex_bindings_to_input(std::vector<asset::vk_shader_data::vertex_binding_info> bindings) {
@@ -30,7 +32,7 @@ vk_vertex_input vertex_bindings_to_input(std::vector<asset::vk_shader_data::vert
 }
 
 vkw::vk_image_view_pair create_sampled_texture(const vkw::vk_device& device,
-    const vkw::vk_queue_graphics& g_queue, const vkw::vk_queue_transfer& t_queue, const_byte_span data,
+    const vkw::vk_queue& g_queue, const vkw::vk_queue& t_queue, const_byte_span data,
     VkExtent2D dimensions, u32_t mip_lvls, VkFormat img_format)
 {
     vkw::vk_buffer staging_buffer{ device,
@@ -51,11 +53,12 @@ vkw::vk_image_view_pair create_sampled_texture(const vkw::vk_device& device,
         VK_IMAGE_ASPECT_COLOR_BIT
     };
 
-    g_queue.transition_image_layout(texture.image(),
+    // execute
+    vkw::execute_cmd_once<vkw::transition_image_layout>(g_queue, texture.image(),
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
     );
-    t_queue.copy_buffer_to_image(staging_buffer.handle(), texture.image());
-    g_queue.generate_mip_maps(texture.image());
+    vkw::execute_cmd_once<vkw::copy_buffer_to_image>(t_queue, staging_buffer.handle(), texture.image());
+    vkw::execute_cmd_once<vkw::generate_mip_maps>(g_queue, texture.image());
 
     return texture;
 }
