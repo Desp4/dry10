@@ -5,7 +5,7 @@ namespace dry::vkw {
 vk_pipeline_graphics::vk_pipeline_graphics(const vk_device& device,
     const vk_render_pass& pass, VkExtent2D extent, std::span<const vk_shader_module> modules,
     std::span<const VkVertexInputBindingDescription> vertex_bindings, std::span<const VkVertexInputAttributeDescription> vertex_attributes,
-    std::span<const VkDescriptorSetLayout> layouts) :
+    std::span<const VkDescriptorSetLayout> layouts, const g_pipeline_create_ctx& ctx) :
     _device{ &device }
 {
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
@@ -58,7 +58,7 @@ vk_pipeline_graphics::vk_pipeline_graphics(const vk_device& device,
     raster_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     raster_info.depthClampEnable = VK_FALSE;
     raster_info.rasterizerDiscardEnable = VK_FALSE;
-    raster_info.polygonMode = VK_POLYGON_MODE_FILL;
+    raster_info.polygonMode = ctx.fill_mode;
     raster_info.lineWidth = 1.0f;
     raster_info.cullMode = VK_CULL_MODE_BACK_BIT;
     raster_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;

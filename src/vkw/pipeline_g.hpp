@@ -3,19 +3,21 @@
 #ifndef DRY_VK_PIPELINE_G_H
 #define DRY_VK_PIPELINE_G_H
 
-#include "asset/vk_reflect.hpp"
-
 #include "renderpass.hpp"
 #include "shader/shader.hpp"
 
 namespace dry::vkw {
+
+struct g_pipeline_create_ctx {
+    VkPolygonMode fill_mode = VK_POLYGON_MODE_FILL;
+};
 
 class vk_pipeline_graphics {
 public:
     vk_pipeline_graphics(const vk_device& device,
         const vk_render_pass& pass, VkExtent2D extent, std::span<const vk_shader_module> modules,
         std::span<const VkVertexInputBindingDescription> vertex_bindings, std::span<const VkVertexInputAttributeDescription> vertex_attributes,
-        std::span<const VkDescriptorSetLayout> layouts
+        std::span<const VkDescriptorSetLayout> layouts, const g_pipeline_create_ctx& ctx
     );
 
     vk_pipeline_graphics() = default;

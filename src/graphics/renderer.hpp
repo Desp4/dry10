@@ -69,8 +69,8 @@ public:
     void submit_frame();
 
     resource_id create_texture(const asset::texture_source& tex);
-    resource_id create_mesh(const asset::mesh_asset& mesh);
-    resource_id create_shader(const asset::shader_asset& shader);
+    resource_id create_mesh(const asset::mesh_source& mesh);
+    resource_id create_shader(const asset::shader_source& shader);
 
     template<typename Material, typename... Ts>
     resource_id create_material(resource_id pipeline, Ts&&... args);
@@ -141,7 +141,8 @@ private:
     };
     static constexpr VkPhysicalDeviceFeatures _device_features{
         .sampleRateShading = VK_TRUE,
-        .samplerAnisotropy = VK_TRUE
+        .fillModeNonSolid = VK_TRUE,
+        .samplerAnisotropy = VK_TRUE,
     };
     static constexpr VkFormat _primary_image_format = VK_FORMAT_B8G8R8A8_SRGB;
     static constexpr VkFormat _primary_depth_format = VK_FORMAT_D32_SFLOAT;

@@ -18,5 +18,5 @@ if (DRY_BUILD_DRY1)
 endif()
 
 if (DRY_BUILD_TESTS)
-    add_subdirectory(tests/sandbox ${PROJECT_BINARY_DIR}/tests/sandbox)
+    add_subdirectory(tests ${PROJECT_BINARY_DIR}/tests)
 endif()

@@ -12,6 +12,7 @@
 #include "util/num.hpp"
 
 #include "graphics/material_base.hpp"
+#include "vkw/pipeline_g.hpp"
 
 namespace dry::asset {
 
@@ -52,6 +53,7 @@ struct shader_source {
 
     shader_unit vert_stage;
     std::vector<shader_unit> oth_stages;
+    vkw::g_pipeline_create_ctx create_ctx; // defaulted
 };
 
 struct material_source {

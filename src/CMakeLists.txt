@@ -47,6 +47,8 @@ set(ENGINE_SOURCES engine/dry_program.cpp)
 set(UTIL_SOURCES
     util/fs.cpp)
 
+set (MATH_SOURCES math/geometry.cpp)
+
 add_library(dry1 STATIC
     ${DEP_SOURCES}
     ${VKW_SOURCES} 
@@ -54,7 +56,8 @@ add_library(dry1 STATIC
     ${GRAPHICS_SOURCES}
     ${ASSET_SOURCES}
     ${ENGINE_SOURCES}
-    ${UTIL_SOURCES})
+    ${UTIL_SOURCES}
+    ${MATH_SOURCES})
 
 target_include_directories(dry1 PUBLIC ${PROJECT_SOURCE_DIR})
 target_link_libraries(dry1 PUBLIC

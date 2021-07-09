@@ -38,7 +38,7 @@ vulkan_renderer::resource_id vulkan_renderer::create_texture(const asset::textur
     return static_cast<resource_id>(tex_ind);
 }
 
-vulkan_renderer::resource_id vulkan_renderer::create_mesh(const asset::mesh_asset& mesh) {
+vulkan_renderer::resource_id vulkan_renderer::create_mesh(const asset::mesh_source& mesh) {
     renderer_resources::vertex_buffer mesh_buffer;
     // TODO : buffer for each mesh currently, do: allocate into one and offset into it
     mesh_buffer.indices = vkw::create_local_buffer(_transfer_queue, _device,
@@ -51,7 +51,7 @@ vulkan_renderer::resource_id vulkan_renderer::create_mesh(const asset::mesh_asse
     return static_cast<resource_id>(_resources.vertex_buffers.emplace(std::move(mesh_buffer)));
 }
 
-vulkan_renderer::resource_id vulkan_renderer::create_shader(const asset::shader_asset& shader) {
+vulkan_renderer::resource_id vulkan_renderer::create_shader(const asset::shader_source& shader) {
     renderer_resources::shader_pipeline new_pipeline;
     new_pipeline.shared_descriptors.resize(_image_count);
 
@@ -107,7 +107,7 @@ vulkan_renderer::resource_id vulkan_renderer::create_shader(const asset::shader_
     }
 
     new_pipeline.pipeline = vkw::vk_pipeline_graphics{ _device, _render_pass, _extent, shader_modules,
-        std::span{ &vert_input_info.binding_desc, 1 }, vert_input_info.attribute_desc, desc_layouts
+        std::span{ &vert_input_info.binding_desc, 1 }, vert_input_info.attribute_desc, desc_layouts, shader.create_ctx
     };
 
     if (new_pipeline.pipeline_data.has_materials()) {

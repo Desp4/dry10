@@ -1,6 +1,6 @@
 #include <random>
 
-#include "engine/dry_program.hpp"
+#include "common.hpp"
 
 using namespace dry;
 
@@ -15,12 +15,7 @@ public:
     }
 };
 
-class empty_material : public material_base {
-public:
-    void write_material_info(std::byte* dst) const override {}
-};
-
-class orbitals : public dry_program {
+class orbitals : public fps_dry_program {
 public:
     orbitals();
     ~orbitals();
@@ -77,14 +72,11 @@ private:
     f64_t _delete_timer = _spawn_delete_start;
     f64_t _create_timer = _spawn_create_start;
 
-    f32_t _camera_pitch = 0;
-    f32_t _camera_yaw = 0;
-
     std::vector<f64_t> _frame_times;
     u32_t _frame_time_ind = 0;
 };
 
-orbitals::orbitals() : dry_program{} {
+orbitals::orbitals() : fps_dry_program{} {
     // create materials
     for (auto i = 0u; i < _shader_names.size(); ++i) {
         // pos shader has different material
@@ -161,27 +153,7 @@ bool orbitals::update() {
     _camera.fov += _wheel_delta * _fov_speed;
     _camera.fov = std::clamp(_camera.fov, glm::radians(5.0f), glm::radians(120.0f));
 
-    {
-        const auto camera_front = glm::normalize(glm::rotate(_camera.trans.rotation, { 0, 0, 1 }));
-        const auto camera_side = glm::normalize(glm::cross(camera_front, { 0, 1, 0 }));
-        const f32_t mouse_x = _keyboard_input.test(GLFW_KEY_W) - _keyboard_input.test(GLFW_KEY_S);
-        const f32_t mouse_y = _keyboard_input.test(GLFW_KEY_D) - _keyboard_input.test(GLFW_KEY_A);
-        // glm come on
-        _camera.trans.position += static_cast<f32_t>(mouse_x * _camera_speed * _delta_time) * camera_front;
-        _camera.trans.position += static_cast<f32_t>(mouse_y * _camera_speed * _delta_time) * camera_side;
-
-        // suboptimal rotation, learn math pls
-        constexpr f32_t pitch_limit = glm::radians(89.0f);
-        _camera_pitch += _mouse_input.dy * _camera_sensetivity;
-        _camera_pitch = std::clamp(_camera_pitch, -pitch_limit, pitch_limit);
-        _camera_yaw += -_mouse_input.dx * _camera_sensetivity;
-
-        const glm::quat pitch = glm::angleAxis(_camera_pitch, glm::vec3{ 1, 0, 0 });
-        const glm::quat yaw = glm::angleAxis(_camera_yaw, glm::vec3{ 0, 1, 0 });
-
-        _camera.trans.rotation = yaw * pitch;
-    }
-
+    update_camera(_camera_speed, _camera_sensetivity);
 
     if (_delete_timer >= _spawn_period) {
         for (auto& orbit : _orbits) {
