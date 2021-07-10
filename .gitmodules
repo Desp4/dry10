@@ -1,9 +1,6 @@
 [submodule "external/tinygltf"]
 	path = external/tinygltf
 	url = https://github.com/syoyo/tinygltf.git
-[submodule "external/zlib"]
-	path = external/zlib
-	url = https://github.com/madler/zlib.git
 [submodule "external/libzip"]
 	path = external/libzip
 	url = https://github.com/nih-at/libzip.git
