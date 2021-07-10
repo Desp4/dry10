@@ -1,24 +1,10 @@
-include(FetchContent)
-
 function(fetch_tinygltf)
     if (TARGET tinygltf)
         return()
     endif()
 
-    set(TINYGLTF_REPO https://github.com/syoyo/tinygltf.git)
-    set(TINYGLTF_VER v2.5.0)
-
-    # no package search, maybe a TODO
-    message("-- downloading tinygltf ${TINYGLTF_VER}")
-    FetchContent_Declare(DEP_TINYGLTF
-        GIT_REPOSITORY ${TINYGLTF_REPO}
-        GIT_TAG ${TINYGLTF_VER})
-
-    if(NOT DEP_TINYGLTF_POPULATED)
-        FetchContent_Populate(DEP_TINYGLTF)
-    endif()
     add_library(tinygltf INTERFACE)
-    target_include_directories(tinygltf INTERFACE ${dep_tinygltf_SOURCE_DIR})
+    target_include_directories(tinygltf INTERFACE external/tinygltf)
 endfunction()
 
 function(fetch_libzip)
@@ -27,21 +13,12 @@ function(fetch_libzip)
     endif()
 
     if (NOT TARGET zlibstatic)
-        set(ZLIB_REPO https://github.com/madler/zlib.git)
-        set(ZLIB_VER v1.2.11)
+        # TODO : copies zconf.h in source dir, can't submodule it, make a fork that doesn't do that
+        add_subdirectory(external/zlib ${PROJECT_BINARY_DIR}/external/zlib)
 
-        message("-- downloading zlib ${ZLIB_VER}")
-        FetchContent_Declare(DEP_ZLIB
-            GIT_REPOSITORY ${ZLIB_REPO}
-            GIT_TAG ${ZLIB_VER})
-        FetchContent_MakeAvailable(DEP_ZLIB)
-
-        set(ZLIB_INC ${dep_zlib_SOURCE_DIR} ${dep_zlib_BINARY_DIR})
+        set(ZLIB_INC external/zlib ${PROJECT_BINARY_DIR}/external/zlib)
         target_include_directories(zlibstatic PUBLIC ${ZLIB_INC})
     endif()
-
-    set(LIBZIP_REPO https://github.com/nih-at/libzip.git)
-    set(LIBZIP_VER v1.7.3)
 
     set(ENABLE_BZIP2 OFF CACHE INTERNAL "Internal dependency option" FORCE)
     set(ENABLE_LZMA OFF CACHE INTERNAL "Internal dependency option" FORCE)
@@ -58,11 +35,7 @@ function(fetch_libzip)
     set(PREV_CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
     set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake/hacks)
 
-    message("-- downloading libzip ${LIBZIP_VER}")
-    FetchContent_Declare(DEP_LIBZIP
-        GIT_REPOSITORY ${LIBZIP_REPO}
-        GIT_TAG ${LIBZIP_VER})
-    FetchContent_MakeAvailable(DEP_LIBZIP)
+    add_subdirectory(external/libzip ${PROJECT_BINARY_DIR}/external/libzip)
 
     set(CMAKE_MODULE_PATH ${PREV_CMAKE_MODULE_PATH})
 endfunction()
@@ -81,24 +54,17 @@ function(fetch_glfw)
         return()
     endif()
 
-    set(GLFW_REPO https://github.com/glfw/glfw.git)
-    set(GLFW_VER 3.3.4)
-
     # settings
     set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "Internal dependency option" FORCE)
     set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "Internal dependency option" FORCE)
     set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "Internal dependency option" FORCE)
     set(GLFW_INSTALL OFF CACHE INTERNAL "Internal dependency option" FORCE)
 
-    message("-- downloading glfw ${GLFW_VER}")
-    FetchContent_Declare(DEP_GLFW
-        GIT_REPOSITORY ${GLFW_REPO}
-        GIT_TAG ${GLFW_VER})
-    FetchContent_MakeAvailable(DEP_GLFW)
+    add_subdirectory(external/glfw ${PROJECT_BINARY_DIR}/external/glfw)
 
     # link
     target_link_libraries(glfw PUBLIC ${GLFW_LIBRARIES})
-    target_include_directories(glfw PUBLIC "${DEP_GLFW_SOURCE_DIR}/include")
+    target_include_directories(glfw PUBLIC external/glfw/include)
 endfunction()
 
 function(fetch_glm)
@@ -106,14 +72,7 @@ function(fetch_glm)
         return()
     endif()
 
-    set(GLM_REPO https://github.com/g-truc/glm.git)
-    set(GLM_VER 0.9.9.8)
-
-    message("-- downloading glm ${GLM_VER}")
-    FetchContent_Declare(DEP_GLM
-        GIT_REPOSITORY ${GLM_REPO}
-        GIT_TAG ${GLM_VER})
-    FetchContent_MakeAvailable(DEP_GLM)  
+    add_subdirectory(external/glm ${PROJECT_BINARY_DIR}/external/glm)
 endfunction()
 
 function(fetch_shaderc)
@@ -123,65 +82,33 @@ function(fetch_shaderc)
 
     if (NOT TARGET SPIRV-Tools)
         if (NOT SPIRV-Headers_SOURCE_DIR) # NOTE : here not a target but a variable
-            set(SPIRV_HEADERS_REPO https://github.com/KhronosGroup/SPIRV-Headers.git)
-            set(SPIRV_HEADERS_HASH 07f259e68af3a540038fa32df522554e74f53ed5)
-            # TODO : installation should work too, need to dance to make it work with spirv tools
-            message("-- downloading SPIRV-Headers")
-
-            FetchContent_Declare(DEP_SPIRV_HEADERS
-                GIT_REPOSITORY ${SPIRV_HEADERS_REPO}
-                URL_HASH ${SPIRV_HEADERS_HASH})
-
-            if(NOT DEP_SPIRV_HEADERS_POPULATED)
-                FetchContent_Populate(DEP_SPIRV_HEADERS)               
-            endif()
-            set(SPIRV-Headers_SOURCE_DIR ${dep_spirv_headers_SOURCE_DIR})
+            set(SPIRV-Headers_SOURCE_DIR ${PROJECT_SOURCE_DIR}/external/spirv-headers)
         endif()
-
-        set(SPIRV_TOOLS_REPO https://github.com/KhronosGroup/SPIRV-Tools.git)
-        set(SPIRV_TOOLS_HASH 5dd2f76918bb2d0d67628e338f60f724f3e02e13)
 
         # settings
         set(SKIP_SPIRV_TOOLS_INSTALL ON CACHE INTERNAL "Internal dependency option" FORCE)
         set(SPIRV_SKIP_EXECUTABLES ON CACHE INTERNAL "Internal dependency option" FORCE)
         set(SPIRV_SKIP_TESTS ON CACHE INTERNAL "Internal dependency option" FORCE)
 
-        message("-- downloading SPIRV-Tools ${SPIRV_TOOLS_VER}")
-        FetchContent_Declare(DEP_SPIRV_TOOLS
-            GIT_REPOSITORY ${SPIRV_TOOLS_REPO}
-            URL_HASH ${SPIRV_TOOLS_HASH})
-        FetchContent_MakeAvailable(DEP_SPIRV_TOOLS)
+        add_subdirectory(external/spirv-tools ${PROJECT_BINARY_DIR}/external/spirv-tools)
     endif()
 
     if (NOT TARGET glslang)
-        set(GLSLANG_REPO https://github.com/KhronosGroup/glslang.git)
-        set(GLSLANG_VER 11.4.0)
-
         # settings
-        message("-- downloading glslang ${GLSLANG_VER}")
         set(SKIP_GLSLANG_INSTALL ON CACHE INTERNAL "Internal dependency option" FORCE)
         set(ENABLE_HLSL ON CACHE INTERNAL "Internal dependency option" FORCE) # required for shaderc
         set(ENABLE_CTEST OFF CACHE INTERNAL "Internal dependency option" FORCE)
 
-        FetchContent_Declare(DEP_GLSLANG
-            GIT_REPOSITORY ${GLSLANG_REPO}
-            GIT_TAG ${GLSLANG_VER})
-        FetchContent_MakeAvailable(DEP_GLSLANG) 
+        add_subdirectory(external/glslang ${PROJECT_BINARY_DIR}/external/glslang)
     endif()
 
-    set(SHADERC_REPO https://github.com/google/shaderc.git)
-    set(SHADERC_VER v2021.0)
-
+    # settings
     set(SHADERC_SKIP_INSTALL ON CACHE INTERNAL "Internal dependency option" FORCE)
     set(SHADERC_SKIP_TESTS ON CACHE INTERNAL "Internal dependency option" FORCE)
     set(SHADERC_SKIP_EXAMPLES ON CACHE INTERNAL "Internal dependency option" FORCE)
     set(SHADERC_ENABLE_SHARED_CRT ON CACHE INTERNAL "Internal dependency option" FORCE)
 
-    message("-- downloading shaderc ${SHADERC_VER}")
-    FetchContent_Declare(DEP_SHADERC
-        GIT_REPOSITORY ${SHADERC_REPO}
-        GIT_TAG ${SHADERC_VER})
-    FetchContent_MakeAvailable(DEP_SHADERC)
+    add_subdirectory(external/shaderc ${PROJECT_BINARY_DIR}/external/shaderc)
 endfunction()
 
 function(fetch_spirv_cross)
@@ -189,18 +116,11 @@ function(fetch_spirv_cross)
         return()
     endif()
 
-    set(SPIRV_CROSS_REPO https://github.com/KhronosGroup/SPIRV-Cross.git)
-    set(SPIRV_CROSS_VER 2021-01-15)
-
     # settings
-    message("-- downloading spirv-cross ${SPIRV_CROSS_VER}")
     set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE INTERNAL "Internal dependency option" FORCE)
     set(SPIRV_CROSS_SKIP_INSTALL ON CACHE INTERNAL "Internal dependency option" FORCE)
 
-    FetchContent_Declare(DEP_SPIRV_CROSS
-        GIT_REPOSITORY ${SPIRV_CROSS_REPO}
-        GIT_TAG ${SPIRV_CROSS_VER})
-    FetchContent_MakeAvailable(DEP_SPIRV_CROSS)
+    add_subdirectory(external/spirv-cross ${PROJECT_BINARY_DIR}/external/spirv-cross)
 endfunction()
 
 function(fetch_vulkan)
@@ -226,21 +146,13 @@ function(fetch_vma)
     # NOTE : for static linking need alias, so need vulkan as a target first
     fetch_vulkan()
 
-    set(VMA_REPO https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git)
-    set(VMA_HASH 0790b5f0a9b96cd79fe75e4f458fc6b468dd9ec3)
-
     # NOTE : force static
-    message("-- downloading VulkanMemoryAllocator")
     set(VMA_STATIC_VULKAN_FUNCTIONS ON CACHE INTERNAL "Internal dependency option" FORCE)
     set(VMA_DYNAMIC_VULKAN_FUNCTIONS OFF CACHE INTERNAL "Internal dependency option" FORCE)
 
     add_library(Vulkan::Vulkan ALIAS vulkan)
 
-    FetchContent_Declare(DEP_VMA
-        GIT_REPOSITORY ${VMA_REPO}
-        URL_HASH ${VMA_HASH})
-    FetchContent_MakeAvailable(DEP_VMA)
-
+    add_subdirectory(external/vma ${PROJECT_BINARY_DIR}/external/vma)
     add_library(vma ALIAS VulkanMemoryAllocator)
 endfunction()
 

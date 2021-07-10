@@ -8,7 +8,7 @@ public:
 
     bool update() override;
 
-private:
+private: 
     static constexpr std::array _mesh_names{ "volga", "viking_room", "granite" };
     static constexpr std::array _mesh_scaling_factors{ 1.0f, 0.02f , 1.0f };
 
@@ -21,7 +21,7 @@ private:
 
 
 mtf_test::mtf_test() : fps_dry_program{} {
-    // create quad
+    // create circle
     constexpr u32_t circle_resolution = 128;
     constexpr f32_t circle_angle_delta = 2.0f * glm::pi<f32_t>() / circle_resolution;
 

@@ -56,6 +56,11 @@ sphere mb_dash(const std::vector<glm::vec3>& b) {
 	return { .pos = c + b[0], .radius = std::sqrtf(vec3_transpose_mul(c, c)) };
 }
 
+/*
+    Implementation of algorithms described in:
+    [1] Bernd Gartner, "Fast and Robust Smallest Enclosing Balls"
+    [2] Emo Welzl, "Smallest enclosing disks (balls and ellipsoids)"
+*/
 sphere mtf_mb(std::span<glm::vec3> l, std::vector<glm::vec3>& b) {
 	auto mb = mb_dash(b);
 

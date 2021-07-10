@@ -1,0 +1,33 @@
+[submodule "external/tinygltf"]
+	path = external/tinygltf
+	url = https://github.com/syoyo/tinygltf.git
+[submodule "external/zlib"]
+	path = external/zlib
+	url = https://github.com/madler/zlib.git
+[submodule "external/libzip"]
+	path = external/libzip
+	url = https://github.com/nih-at/libzip.git
+[submodule "external/glfw"]
+	path = external/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "external/glm"]
+	path = external/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "external/spirv-headers"]
+	path = external/spirv-headers
+	url = https://github.com/KhronosGroup/SPIRV-Headers.git
+[submodule "external/spirv-tools"]
+	path = external/spirv-tools
+	url = https://github.com/KhronosGroup/SPIRV-Tools.git
+[submodule "external/glslang"]
+	path = external/glslang
+	url = https://github.com/KhronosGroup/glslang.git
+[submodule "external/shaderc"]
+	path = external/shaderc
+	url = https://github.com/google/shaderc.git
+[submodule "external/spirv-cross"]
+	path = external/spirv-cross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
+[submodule "external/vma"]
+	path = external/vma
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
