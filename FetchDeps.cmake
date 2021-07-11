@@ -13,11 +13,17 @@ function(fetch_libzip)
     endif()
 
     if (NOT TARGET zlibstatic)
-        # TODO : copies zconf.h in source dir, can't submodule it, make a fork that doesn't do that
         add_subdirectory(external/zlib ${PROJECT_BINARY_DIR}/external/zlib)
 
         set(ZLIB_INC external/zlib ${PROJECT_BINARY_DIR}/external/zlib)
         target_include_directories(zlibstatic PUBLIC ${ZLIB_INC})
+
+        add_custom_target(clean_zlib
+            COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/external/zlib/zconf.h.included ${PROJECT_SOURCE_DIR}/external/zlib/zconf.h
+            COMMAND ${CMAKE_COMMAND} -E remove ${PROJECT_SOURCE_DIR}/external/zlib/zconf.h.included
+            COMMENT "cleaning zlib directory"
+        )
+        add_dependencies(zlibstatic clean_zlib)
     endif()
 
     set(ENABLE_BZIP2 OFF CACHE INTERNAL "Internal dependency option" FORCE)
