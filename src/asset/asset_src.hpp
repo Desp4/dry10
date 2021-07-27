@@ -68,31 +68,6 @@ struct material_source {
     {}
 };
 
-// extension lookup
-template<typename>
-struct asset_source_ext {
-    static constexpr std::string_view ext = ".NULL";
-};
-
-template<>
-struct asset_source_ext<mesh_source> {
-    static constexpr std::string_view ext = ".mesh";
-};
-template<>
-struct asset_source_ext<texture_source> {
-    static constexpr std::string_view ext = ".texture";
-};
-template<>
-struct asset_source_ext<shader_source> {
-    static constexpr std::string_view vert_ext = ".vertex.shader";
-    static constexpr std::string_view frag_ext = ".fragment.shader";
-
-    static constexpr std::string_view ext = ".shader";
-};
-
-template<typename Asset>
-constexpr std::string_view asset_source_ext_v = asset_source_ext<Asset>::ext;
-
 template<typename T>
 struct hashed_asset : public T {
     using T::T;

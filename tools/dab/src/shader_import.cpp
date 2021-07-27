@@ -1,19 +1,18 @@
-#include <array>
-#include <fstream>
-
 #include <shaderc/shaderc.hpp>
 
-#include "dab.hpp"
+#include "importers.hpp"
 
 struct pragma_info {
-    std::uint64_t offset;
+    u64_t offset;
     std::string string;
 };
+
+// TODO : rewrite to not span multiple asset files, pack in one
 
 // naive preprocessor
 static std::pair<pragma_info, bool> find_pragma(std::ifstream& file) {
     std::string line_buffer;
-    std::uint64_t offset = 0;
+    u64_t offset = 0;
 
     while (std::getline(file, line_buffer)) {
         std::stringstream line_ss{ line_buffer };
@@ -38,17 +37,17 @@ parsed_file parse_shader(const fs::path& path) {
     }; // NOTE : be aware of the order, should be compatible with shaderc_shader_kind
 
     std::ifstream glsl_src{ path, std::ios_base::ate | std::ios_base::in };
-    const std::size_t end_pos = glsl_src.tellg();
+    const size_t end_pos = glsl_src.tellg();
     glsl_src.seekg(0, std::ios_base::beg);
 
     struct shader_unit {
-        std::size_t offset;
-        std::size_t length;
+        size_t offset;
+        size_t length;
         shaderc_shader_kind kind;
     };
     std::vector<shader_unit> shader_units;
 
-    std::size_t current_length = 0; // need for not breaking on unknown pragmas
+    size_t current_length = 0; // need for not breaking on unknown pragmas
     while (true) {
         const std::pair<pragma_info, bool> current_pragma = find_pragma(glsl_src);
         current_length += current_pragma.first.offset;
@@ -78,14 +77,14 @@ parsed_file parse_shader(const fs::path& path) {
     glsl_src.clear();
 
     std::vector<char> unit_src;
-    std::array<std::uint32_t, pragma_shader_type.size()> shader_type_counts{ 0 };
+    std::array<u32_t, pragma_shader_type.size()> shader_type_counts{ 0 };
     const auto name = path.stem().string();
 
     parsed_file ret_file;
     for (const auto& unit : shader_units) {
-        const std::string unit_name = 
+        std::string unit_name = 
             name + '.' + std::to_string(shader_type_counts[unit.kind]) +
-            '.' + pragma_shader_type[unit.kind] + ".shader";
+            '.' + pragma_shader_type[unit.kind];
 
         shader_type_counts[unit.kind] += 1;
 
@@ -103,10 +102,10 @@ parsed_file parse_shader(const fs::path& path) {
             };
         }
 
-        const byte_vector unit_bin{ reinterpret_cast<const std::byte*>(unit_result.begin()), reinterpret_cast<const std::byte*>(unit_result.end()) };
+        byte_vector unit_bin{ reinterpret_cast<const std::byte*>(unit_result.begin()), reinterpret_cast<const std::byte*>(unit_result.end()) };
         ret_file.emplace_back(std::move(unit_bin), std::move(unit_name));
     }
-    ret_file.emplace_back(byte_vector{}, name + ".shader");
+    ret_file.emplace_back(byte_vector{}, name);
 
     return ret_file;
 }

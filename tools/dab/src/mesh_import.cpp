@@ -1,32 +1,11 @@
 #include <span>
-#include <concepts>
 
 #include <tiny_gltf.h>
 
-#include "dab.hpp"
-
-template<typename Container>
-static byte_vector& operator<<(byte_vector& dst_bytes, const Container& container) {
-    using value_type = typename Container::value_type;
-
-    const auto dst_ind = dst_bytes.size();
-    dst_bytes.resize(dst_bytes.size() + container.size() * sizeof(value_type));
-
-    std::copy(container.begin(), container.end(), reinterpret_cast<value_type*>(dst_bytes.data() + dst_ind));
-    return dst_bytes;
-}
-
-template<std::integral T>
-static byte_vector& operator<<(byte_vector& dst_bytes, T value) {
-    const auto dst_ind = dst_bytes.size();
-    dst_bytes.resize(dst_bytes.size() + sizeof(T));
-
-    *reinterpret_cast<T*>(dst_bytes.data() + dst_ind) = value;
-    return dst_bytes;
-}
+#include "importers.hpp"
 
 template<typename T>
-static std::span<const T> get_accessor_buffer(const tinygltf::Model& model, std::uint32_t accessor_ind) {
+static std::span<const T> get_accessor_buffer(const tinygltf::Model& model, u32_t accessor_ind) {
     const auto& accessor = model.accessors[accessor_ind];
     const auto& buffer_view = model.bufferViews[accessor.bufferView];
     const auto& buffer = model.buffers[buffer_view.buffer];
@@ -36,20 +15,20 @@ static std::span<const T> get_accessor_buffer(const tinygltf::Model& model, std:
 }
 
 template<typename T>
-static std::vector<std::uint32_t> cast_indices_range(const tinygltf::Model& model, std::uint32_t accessor) {
+static std::vector<u32_t> cast_indices_range(const tinygltf::Model& model, u32_t accessor) {
     const auto span = get_accessor_buffer<T>(model, accessor);
-    std::vector<std::uint32_t> ret;
+    std::vector<u32_t> ret;
     ret.reserve(span.size());
 
     for (auto el : span) {
-        ret.push_back(static_cast<std::uint32_t>(el));
+        ret.push_back(static_cast<u32_t>(el));
     }
     return ret;   
 }
 
 template<>
-static std::vector<std::uint32_t> cast_indices_range<std::uint32_t>(const tinygltf::Model& model, std::uint32_t accessor) {
-    const auto span = get_accessor_buffer<std::uint32_t>(model, accessor);
+static std::vector<u32_t> cast_indices_range<u32_t>(const tinygltf::Model& model, u32_t accessor) {
+    const auto span = get_accessor_buffer<u32_t>(model, accessor);
     return { span.begin(), span.end() };
 }
 
@@ -76,7 +55,7 @@ parsed_file parse_mesh(const fs::path& path) {
         struct vec2 { float x = 0.0f, y = 0.0f; };
         struct vertex { vec3 pos; vec3 normal; vec2 uv; };
 
-        std::vector<std::uint32_t> mesh_indices;
+        std::vector<u32_t> mesh_indices;
         std::vector<vertex> mesh_vertices;
         // TODO : dig through docs or try mesh with multiple primitives, need to have proper indices
         for (const auto& primitive : mesh.primitives) {
@@ -89,11 +68,11 @@ parsed_file parse_mesh(const fs::path& path) {
 
             std::vector<std::uint32_t> indices;
             switch (ind_type) {
-            case 5120: indices = cast_indices_range<std::int8_t>(model, primitive.indices); break;
-            case 5121: indices = cast_indices_range<std::uint8_t>(model, primitive.indices); break;
-            case 5122: indices = cast_indices_range<std::int16_t>(model, primitive.indices); break;
-            case 5123: indices = cast_indices_range<std::uint16_t>(model, primitive.indices); break;
-            case 5125: indices = cast_indices_range<std::uint32_t>(model, primitive.indices); break;
+            case 5120: indices = cast_indices_range<i8_t>(model, primitive.indices); break;
+            case 5121: indices = cast_indices_range<u8_t>(model, primitive.indices); break;
+            case 5122: indices = cast_indices_range<i16_t>(model, primitive.indices); break;
+            case 5123: indices = cast_indices_range<u16_t>(model, primitive.indices); break;
+            case 5125: indices = cast_indices_range<u32_t>(model, primitive.indices); break;
             default: throw std::runtime_error{ "Unexpected index format in GLTF file " + path.string() + " this shouldn't happen" };
             }
 
@@ -123,14 +102,14 @@ parsed_file parse_mesh(const fs::path& path) {
             mesh_vertices.insert(mesh_vertices.end(), vertices.begin(), vertices.end());
         }
 
-        const std::uint64_t index_count = mesh_indices.size();
-        const std::uint64_t vertex_count = mesh_vertices.size();
+        const u64_t index_count = mesh_indices.size();
+        const u64_t vertex_count = mesh_vertices.size();
 
         byte_vector mesh_data;
-        mesh_data.reserve(sizeof(std::uint64_t) * 2 + index_count * sizeof(std::uint32_t) + vertex_count * sizeof(vertex));
+        mesh_data.reserve(sizeof(u64_t) * 2 + index_count * sizeof(u32_t) + vertex_count * sizeof(vertex));
         mesh_data << index_count << vertex_count << mesh_indices << mesh_vertices;
        
-        ret_file.emplace_back(std::move(mesh_data), mesh.name + ".mesh");
+        ret_file.emplace_back(std::move(mesh_data), mesh.name);
     }
     return ret_file;
 }

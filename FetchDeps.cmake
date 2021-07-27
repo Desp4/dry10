@@ -7,45 +7,6 @@ function(fetch_tinygltf)
     target_include_directories(tinygltf INTERFACE external/tinygltf)
 endfunction()
 
-function(fetch_libzip)
-    if (TARGET zip)
-        return()
-    endif()
-
-    if (NOT TARGET zlibstatic)
-        add_subdirectory(external/zlib ${PROJECT_BINARY_DIR}/external/zlib)
-
-        set(ZLIB_INC external/zlib ${PROJECT_BINARY_DIR}/external/zlib)
-        target_include_directories(zlibstatic PUBLIC ${ZLIB_INC})
-
-        add_custom_target(clean_zlib
-            COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/external/zlib/zconf.h.included ${PROJECT_SOURCE_DIR}/external/zlib/zconf.h
-            COMMAND ${CMAKE_COMMAND} -E remove ${PROJECT_SOURCE_DIR}/external/zlib/zconf.h.included
-            COMMENT "cleaning zlib directory"
-        )
-        add_dependencies(zlibstatic clean_zlib)
-    endif()
-
-    set(ENABLE_BZIP2 OFF CACHE INTERNAL "Internal dependency option" FORCE)
-    set(ENABLE_LZMA OFF CACHE INTERNAL "Internal dependency option" FORCE)
-    set(BUILD_TOOLS OFF CACHE INTERNAL "Internal dependency option" FORCE)
-    set(BUILD_REGRESS OFF CACHE INTERNAL "Internal dependency option" FORCE)
-    set(BUILD_EXAMPLES OFF CACHE INTERNAL "Internal dependency option" FORCE)
-    set(BUILD_DOC OFF CACHE INTERNAL "Internal dependency option" FORCE)
-    set(LIBZIP_DO_INSTALL OFF CACHE INTERNAL "Internal dependency option" FORCE)
-
-    # supress FindZLIB, make alias, export so that libzip exports don't fail
-    add_library(ZLIB::ZLIB ALIAS zlibstatic)
-    export(TARGETS zlibstatic FILE "${CMAKE_CURRENT_BINARY_DIR}/zlibstatic-targets.cmake")
-    # replace find module with a dummy, later revert cmake module path
-    set(PREV_CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
-    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake/hacks)
-
-    add_subdirectory(external/libzip ${PROJECT_BINARY_DIR}/external/libzip)
-
-    set(CMAKE_MODULE_PATH ${PREV_CMAKE_MODULE_PATH})
-endfunction()
-
 function(fetch_stbi)
     if (TARGET stbi)
         return()
@@ -169,7 +130,6 @@ function(fetch_all_deps)
     if (DRY_BUILD_DAB)
         fetch_tinygltf()
         fetch_stbi()
-        fetch_libzip()
         fetch_shaderc()
     endif()
 
@@ -177,7 +137,6 @@ function(fetch_all_deps)
         fetch_vulkan()
         fetch_glfw()
         fetch_glm()
-        fetch_libzip()
         fetch_stbi()
         fetch_spirv_cross()
         fetch_vma()

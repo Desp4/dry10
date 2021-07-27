@@ -9,6 +9,9 @@ option(DRY_BUILD_TESTS "Build tests" ON)
 
 fetch_all_deps()
 
+add_library(dry_common INTERFACE)
+target_include_directories(dry_common INTERFACE ${PROJECT_SOURCE_DIR}/common)
+
 if (DRY_BUILD_DAB)
     add_subdirectory(tools/dab ${PROJECT_BINARY_DIR}/tools/dab)
 endif()

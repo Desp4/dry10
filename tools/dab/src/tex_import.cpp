@@ -1,8 +1,6 @@
-#include "dab.hpp"
-
-#include <fstream>
-
 #include <stb_image.h>
+
+#include "importers.hpp"
 
 parsed_file parse_texture(const fs::path& path) {
     int w = 0, h = 0, ch = 0;
@@ -18,6 +16,6 @@ parsed_file parse_texture(const fs::path& path) {
     tex_src.read(reinterpret_cast<char*>(file_src.data()), file_src.size());
 
     parsed_file ret_file;
-    ret_file.emplace_back(std::move(file_src), path.stem().string() + ".texture");
+    ret_file.emplace_back(std::move(file_src), path.stem().string());
     return ret_file;
 }

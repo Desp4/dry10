@@ -64,7 +64,8 @@ target_link_libraries(dry1 PUBLIC
     vulkan
     glfw
     glm
-    zip
     stbi
     spirv-cross-core
-    vma)
+    vma
+    dablib
+    dry_common)

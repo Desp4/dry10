@@ -11,7 +11,7 @@ target_link_libraries(orbitals PRIVATE dry1)
 target_link_libraries(mtf PRIVATE dry1)
 
 add_custom_target(run_dab
-    COMMAND dab "${PROJECT_SOURCE_DIR}/assets" "${PROJECT_BINARY_DIR}/assets/assets.zip"
+    COMMAND dab upd "${PROJECT_BINARY_DIR}/assets/assets.dab" -r "${PROJECT_SOURCE_DIR}/assets"
     COMMENT "archiving assets for sandbox")
 
 if (NOT EXISTS "${PROJECT_BINARY_DIR}/assets")
