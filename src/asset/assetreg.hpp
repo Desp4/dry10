@@ -7,7 +7,7 @@
 #include <any>
 
 #include "util/type.hpp"
-#include "util/persistent_array.hpp"
+#include "util/sparse_table.hpp"
 #include "filesys.hpp"
 
 namespace dry::asset {
@@ -60,7 +60,8 @@ private:
     filesystem _filesys;
 
     std::vector<std::any> _asset_pools;
-    persistent_array<persistent_index_type> _runtime_asset_indices;
+    // TODO: sparse type
+    sparse_table<u64_t> _runtime_asset_indices;
 
     static constexpr hash_t _runtime_hash_flag = 1 << (sizeof(hash_t) * 8 - 1);
 };
@@ -79,9 +80,13 @@ Asset& asset_registry::get(hash_t hash) {
         if (hash & _runtime_hash_flag) {
             LOG_ERR("Runtime hash %i not found in registry", hash);
             dbg::panic(); // TODO : can throw a fallback
-        }
-        else {
-            load<Asset>(hash);
+        } else {
+            if constexpr (filesystem::asset_serializable<is_hashed_asset<Asset>::type>()) {
+                load<Asset>(hash);
+            } else {
+                LOG_ERR("Asset type is not serializable, only calls to get with runtime hash values are supported");
+                dbg::panic();
+            }
         }
     }
 
@@ -100,7 +105,7 @@ void asset_registry::load(hash_t hash) {
     static const auto t_id = asset_type_id<Asset>::value();
 
     if (hash & _runtime_hash_flag) {
-        LOG_ERR("Can't log an asset with a runtime hash %i", hash);
+        LOG_ERR("Can't load an asset with a runtime hash %i", hash);
         dbg::panic();
     }
 

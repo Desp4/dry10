@@ -15,10 +15,10 @@ namespace dab {
 
 using namespace dry_common;
 
-constexpr u32_t folder_shader = 0;
-constexpr u32_t folder_texture = 1;
-constexpr u32_t folder_mesh = 2;
-constexpr u32_t folder_count = 3;
+constexpr u32_t folder_shader   = 0;
+constexpr u32_t folder_texture  = 1;
+constexpr u32_t folder_mesh     = 2;
+constexpr u32_t folder_count    = 3;
 
 struct dab_asset {
     std::string name;

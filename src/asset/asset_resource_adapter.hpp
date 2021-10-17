@@ -83,7 +83,7 @@ asset_resource_adapter::index_type asset_resource_adapter::get_resource_index(ha
 
     const index_type pipeline_ind = get_resource_index<shader_asset>(res.shader);
 
-    const auto ind = _renderer->create_material<Material>(pipeline_ind, *reinterpret_cast<Material*>(res.material.get()));
+    const auto ind = _renderer->create_material<Material>(pipeline_ind, *dynamic_cast<Material*>(res.material.get()));
     _material_backref[ind] = hash;
 
     return ind;

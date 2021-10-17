@@ -23,7 +23,7 @@ public:
     static constexpr u32_t material_ssbo_location = 0;
 
     pipeline_resources() = default;
-    pipeline_resources(pipeline_resources&&) = default;
+    pipeline_resources(pipeline_resources&&) noexcept = default;
     pipeline_resources(const vkw::vk_device& device, u32_t frame_count, std::vector<shader_layout_info> layout_bindings);
     ~pipeline_resources();
 
@@ -42,7 +42,7 @@ public:
     bool has_materials() const { return _material_data_stride != 0; }
     bool has_resources() const { return _layout.handle() != VK_NULL_HANDLE; }
 
-    pipeline_resources& operator=(pipeline_resources&&) = default;
+    pipeline_resources& operator=(pipeline_resources&&) noexcept = default;
 
 private:
     using desc_write_res = std::variant<std::unique_ptr<VkDescriptorBufferInfo[]>, std::unique_ptr<VkDescriptorImageInfo[]>>;
@@ -56,13 +56,14 @@ private:
         u32_t offset;
     };
 
-    void assure_buffer_location_map_size(std::span<const shader_layout_info> bindings);
+    // TODO: ??? not defined
+    //void assure_buffer_location_map_size(std::span<const shader_layout_info> bindings);
     void assure_material_ssbo(std::span<const shader_layout_info> bindings);
 
     void create_ubos(assure_input& input_ctx, std::span<const shader_layout_info> bindings);
     void create_ssbos(assure_input& input_ctx, std::span<const shader_layout_info> bindings);
 
-    const vkw::vk_device* _device;
+    const vkw::vk_device* _device = nullptr;
 
     vkw::vk_descriptor_layout _layout;
     vkw::vk_descriptor_pool _desc_pool;
@@ -83,8 +84,8 @@ private:
     } _staging_ubo;
     
 
-    u32_t _frame_count;
-    u32_t _material_data_stride;
+    u32_t _frame_count = 0;
+    u32_t _material_data_stride = 0;
 };
 
 template<typename T>

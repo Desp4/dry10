@@ -71,8 +71,6 @@ sphere mtf_mb(std::span<glm::vec3> l, std::vector<glm::vec3>& b) {
 
 	for (auto i = 0u; i < l.size(); ++i) {
 		if (!is_within_sphere(l[i], mb)) {
-			assert(b.size() != 4);
-
 			std::vector<glm::vec3> b_pi = b;
 			b_pi.push_back(l[i]);
 			mb = mtf_mb({ l.begin(), l.begin() + i }, b_pi);

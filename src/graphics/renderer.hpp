@@ -6,7 +6,8 @@
 #include <unordered_map>
 #include <memory>
 
-#include "util/sparse_set.hpp"
+#include "util/sparse_array.hpp"
+#include "util/sparse_table.hpp"
 
 #include "window/window.hpp"
 
@@ -21,14 +22,18 @@
 #include "texarr.hpp"
 #include "material_base.hpp"
 
+#include "math/geometry.hpp"
+
 namespace dry {
 
 struct renderer_resources {
-    using resource_id = persistent_index_type;
+    // TODO: type of sparse containers
+    using resource_id = u64_t;
 
-    struct vertex_buffer {
+    struct mesh_buffer {
         vkw::vk_buffer vertices;
         vkw::vk_buffer indices;
+        math::sphere bounding_sphere;
     };
     using renderable = instanced_pass::instance_input;
     struct shader_pipeline {   
@@ -36,21 +41,21 @@ struct renderer_resources {
         pipeline_resources pipeline_data;
 
         std::vector<std::vector<VkDescriptorSet>> shared_descriptors;
-        std::unordered_map<resource_id, sparse_set<renderable>> renderables;
+        std::unordered_map<resource_id, sparse_array<renderable>> renderables;
 
-        sparse_set<resource_id> material_inds; // TODO : too much redundant info
+        sparse_array<resource_id> material_inds; // TODO : too much redundant info
         // update statuses, getting cluttered TODO :
         std::vector<bool> material_update_status;
         u8_t pending_ubo_transfers = 0;
     };
     
-    persistent_array<vertex_buffer> vertex_buffers;
-    persistent_array<vkw::vk_image_view_pair> textures;
-    persistent_array<std::unique_ptr<material_base>> materials;
-    sparse_set<shader_pipeline> pipelines;
+    sparse_table<mesh_buffer> vertex_buffers;
+    sparse_table<vkw::vk_image_view_pair> textures;
+    sparse_table<std::unique_ptr<material_base>> materials;
+    sparse_array<shader_pipeline> pipelines;
 
     // reference counters
-    using refcount_array = persistent_array<u32_t>;
+    //using refcount_array = persistent_array<u32_t>;
 
     camera_transform cam_transform;
 };
@@ -155,6 +160,7 @@ private:
 };
 
 
+
 template<typename Material, typename... Ts>
 vulkan_renderer::resource_id vulkan_renderer::create_material(resource_id pipeline, Ts&&... args) {
     auto& pipeline_res = _resources.pipelines[pipeline];
@@ -171,7 +177,7 @@ vulkan_renderer::resource_id vulkan_renderer::create_material(resource_id pipeli
     for (auto i = 0u; i < pipeline_res.material_update_status.size(); ++i) {
         pipeline_res.material_update_status[i] = false;
     }
-
+    
     return static_cast<resource_id>(ind);
 }
 

@@ -30,7 +30,6 @@ vulkan_renderer::resource_id vulkan_renderer::create_texture(const asset::textur
         { tex.width, tex.height }, mip_levels, asset::texture_vk_format(tex)
     );
 
-    // _resources.texture_refcount.emplace(0);
     const auto tex_ind = _resources.textures.emplace(std::move(texture));
 
     _texarr.add_texture(static_cast<u32_t>(tex_ind), _resources.textures[tex_ind].view().handle());
@@ -39,7 +38,7 @@ vulkan_renderer::resource_id vulkan_renderer::create_texture(const asset::textur
 }
 
 vulkan_renderer::resource_id vulkan_renderer::create_mesh(const asset::mesh_source& mesh) {
-    renderer_resources::vertex_buffer mesh_buffer;
+    renderer_resources::mesh_buffer mesh_buffer;
     // TODO : buffer for each mesh currently, do: allocate into one and offset into it
     mesh_buffer.indices = vkw::create_local_buffer(_transfer_queue, _device,
         std::span{ mesh.indices }, VK_BUFFER_USAGE_INDEX_BUFFER_BIT
@@ -47,6 +46,15 @@ vulkan_renderer::resource_id vulkan_renderer::create_mesh(const asset::mesh_sour
     mesh_buffer.vertices = vkw::create_local_buffer(_transfer_queue, _device, 
         std::span{ mesh.vertices }, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
     );
+
+    // create bounding sphere
+    {
+        auto vertices = std::vector<glm::vec3>(mesh.indices.size());
+        for (auto i = 0u; i < vertices.size(); ++i) {
+            vertices[i] = mesh.vertices[mesh.indices[i]].pos;
+        }
+        mesh_buffer.bounding_sphere = math::minimal_bounding_sphere(std::move(vertices));
+    }
 
     return static_cast<resource_id>(_resources.vertex_buffers.emplace(std::move(mesh_buffer)));
 }
@@ -128,7 +136,9 @@ vulkan_renderer::renderable_id vulkan_renderer::create_renderable(resource_id ma
     renderable_id rend;
     rend.mesh = static_cast<u16_t>(mesh);
     rend.pipeline = static_cast<u16_t>(material_data.pipeline_index);
-    rend.renderable = static_cast<u32_t>(_resources.pipelines[rend.pipeline].renderables[mesh].emplace(_default_transform, static_cast<u32_t>(material_data.local_index)));
+    rend.renderable = static_cast<u32_t>(
+        _resources.pipelines[rend.pipeline].renderables[mesh].emplace(_default_transform, static_cast<u32_t>(material_data.local_index))
+    );
 
     return rend;
 }

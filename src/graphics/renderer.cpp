@@ -65,7 +65,7 @@ void vulkan_renderer::submit_frame() {
         u32_t object_count = 0;
         for (const auto& pipeline : _resources.pipelines) {
             for (const auto& [mesh, renderables] : pipeline.renderables) {
-                // NOTE : std::copy is probably not smart enough to do a memcpy on sparse_set?
+                // TODO: not a single memcpy call
                 std::copy(renderables.begin(), renderables.end(), &mapped_instances[object_count]);
                 object_count += static_cast<u32_t>(renderables.size());
             }

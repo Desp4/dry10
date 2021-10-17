@@ -29,15 +29,23 @@ filesystem::filesystem() :
 
     for (const auto& dir_entry : std::filesystem::directory_iterator(g_exe_dir.string() + '/' + _root_dir.data())) {
         const auto& entry_path = dir_entry.path();
+
         if (dir_entry.is_regular_file() && entry_path.extension() == ".dab") {
             _dab_file.open(entry_path, std::ios_base::binary | std::ios_base::in);
             auto header = dab::parse_dab_header(_dab_file);
 
-            _header_infos.emplace_back(entry_path, total_assets);
+            header_info info{ .path = entry_path, .hash_offset = total_assets };
+            
+            u32_t folder_offset = 0;
+            for (auto i = 0u; i < dab::folder_count; ++i) {
+                const auto folder_size = static_cast<u32_t>(header.folders[i].size());
 
-            for (const auto& folder : header.folders) {
-                total_assets += static_cast<u32_t>(folder.size());
+                info.folder_offsets[i] = folder_offset;
+                total_assets += folder_size;
+                folder_offset += folder_size;
             }
+
+            _header_infos.emplace_back(std::move(info));
 
             _headers.push_back(std::move(header));
             _dab_file.close();
@@ -81,7 +89,7 @@ mesh_source filesystem::load_asset(u32_t header, u32_t pos) {
 
 template<>
 texture_source filesystem::load_asset(u32_t header, u32_t pos) {
-    const auto texture_file = read_file<texture_asset>(header, pos);
+    const auto texture_file = read_file<texture_source>(header, pos);
 
     int w = 0, h = 0, ch = 0;
     stbi_uc* data = stbi_load_from_memory(
@@ -112,7 +120,7 @@ shader_source filesystem::load_asset(u32_t header, u32_t pos) {
     auto stage_lambda = [this, header, &ret_shader, &name, &folder](std::string_view type, shader_stage stage) {
         for (auto i = 0u;;++i) {
             const std::string shader_name = name + '.' + std::to_string(i) + type.data();
-            const auto it = std::lower_bound(folder.begin(), folder.end(), shader_name, asset_eq_range_comp{});
+            const auto it = std::lower_bound(folder.begin(), folder.end(), shader_name, asset_lower_bound_comp{});
 
             if (it == folder.end() || shader_name != it->name) {
                 break;
@@ -143,11 +151,6 @@ shader_source filesystem::load_asset(u32_t header, u32_t pos) {
 
     ret_shader.oth_stages.shrink_to_fit();
     return ret_shader;
-}
-
-template<>
-material_source filesystem::load_asset(u32_t header, u32_t pos) {
-    return {};
 }
 
 }
